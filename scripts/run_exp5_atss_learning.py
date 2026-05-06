@@ -1,10 +1,10 @@
 """
 run_exp5_atss_learning.py
-=========================
-EXP-5: ATSS online learning convergence curve.
+==========================
+EXP-5: ATSS Online Learning Curve.
 
-Generates 100 random provable formulas and measures solve rate
-per epoch (20 problems/epoch) to demonstrate ATSS online learning.
+Demonstrate that ATSS improves over time on a stream of
+random provable formulas.
 
 Usage:
     python scripts/run_exp5_atss_learning.py
@@ -19,4 +19,4 @@ from experiments.benchmark_suite import ExperimentRunner
 if __name__ == '__main__':
     runner = ExperimentRunner(output_dir=os.path.join(os.path.dirname(__file__), '..', 'experiments'))
     runner.exp_atss_learning_curve(n_problems=100)
-    runner.save_results()
+    runner.save_results('results.csv')

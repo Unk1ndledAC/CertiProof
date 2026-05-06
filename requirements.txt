@@ -1,0 +1,14 @@
+# NeuroProof - Dependencies
+# Core solver uses only Python stdlib (formula, proof, kernel, solver, tactic, tseitin)
+# Plotting and experiments require:
+matplotlib>=3.8
+numpy>=1.24
+pandas>=2.0
+scipy>=1.10
+
+# SOTA baseline solver (optional, for EXP comparisons)
+python-sat>=1.8
+
+# GNN ATSS (optional, requires CUDA-capable GPU for EXP-9)
+# torch>=2.0
+# torch_geometric>=2.4

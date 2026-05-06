@@ -2,15 +2,17 @@
 
 **A Hybrid Propositional Proof System with Adaptive Tactic Synthesis and Certified Proof Checking**
 
-NeuroProof is a hybrid propositional proof system that combines natural deduction, sequent calculus, and resolution with three novel rules: ADAPTIVE_CUT, LEMMA_REUSE, and INTERPOLANT. It features ATSS (Adaptive Tactic Synthesis System), an online bandit-style learning component that guides proof search without pre-training.
+NeuroProof is a hybrid propositional proof system that combines natural deduction, sequent calculus, and resolution with three novel rules: ADAPTIVE_CUT, LEMMA_REUSE, and INTERPOLANT. It features ATSS (Adaptive Tactic Synthesis System), an online bandit-style learning component that guides proof search without pre-training, and an optional GNN-based tactic selector.
 
 ## Key Features
 
 - **Hybrid proof calculus**: Natural deduction + sequent calculus + resolution rules
 - **Novel rules**: ADAPTIVE_CUT (learned cut formula selection), LEMMA_REUSE (proof DAG edge reuse), INTERPOLANT (Craig interpolation via CDCL)
-- **ATSS**: Online tactic synthesis with zero pre-training (EMA updates, softmax policy)
+- **ATSS**: Online tactic synthesis with zero pre-training (EMA updates, cosine similarity ranking)
+- **GNN ATSS**: Optional graph neural network for structure-aware tactic selection (GIN encoder, GPU-accelerated)
 - **Certified checking**: Dual Python/Rocq verification chain following the de Bruijn criterion
 - **DAG proof compression**: Proof size reduction of s - Omega(log s)
+- **CDCL solver**: Full CDCL with 1-UIP conflict analysis, VSIDS, Luby restarts, clause deletion, phase saving
 
 ## Project Structure
 
@@ -22,12 +24,13 @@ NeuroProof/
 │   ├── proof.py                  # Proof steps, ProofBuilder, Rule enum
 │   ├── kernel.py                 # Trusted verification kernel (TCB, 287 lines)
 │   ├── solver.py                 # CDCL solver + ATSS + Craig interpolation
-│   ├── tactic.py                 # Tactic engine (9 tactics)
-│   └── tseitin.py                # Tseitin CNF encoding
+│   ├── tactic.py                 # Tactic engine (9 tactics, GNN integration)
+│   ├── tseitin.py                # Tseitin linear-size CNF encoding
+│   └── atss_gnn.py               # GNN-based tactic selection (optional, GPU)
 ├── experiments/
 │   ├── __init__.py
-│   ├── benchmark_suite.py        # Full benchmark suite (all 5 experiments)
-│   ├── plot_results.py           # Publication-quality plot generation
+│   ├── benchmark_suite.py        # Full benchmark suite (9 experiments)
+│   ├── plot_results.py           # Publication-quality plot generation (8 figures)
 │   ├── results.csv               # Experiment output data
 │   └── figures/                  # Generated plots (PDF)
 ├── scripts/
@@ -39,15 +42,19 @@ NeuroProof/
 │   └── run_all_experiments.py
 ├── coq/
 │   └── NeuroProof.v              # Rocq/Coq formalisation (soundness + ADAPTIVE_CUT)
-├── LICENSE
+├── verify_installation.py        # Quick smoke test (no dependencies)
+├── EXPERIMENTS.md                # Detailed experiment reproduction guide
+├── requirements.txt              # Python dependencies
+├── LICENSE                       # MIT License
 └── README.md
 ```
 
 ## Requirements
 
 - **Python**: 3.10+ (tested on 3.12.4)
-- **Dependencies**: None for core library (pure Python standard library)
-- **Optional**: `matplotlib`, `numpy`, `pandas` for plot generation
+- **Core library**: No external dependencies (pure Python standard library)
+- **Optional**: `matplotlib`, `numpy`, `pandas`, `python-sat` for experiments
+- **Optional**: `torch`, `torch_geometric` for GNN ATSS (GPU recommended)
 - **Optional**: Rocq/Coq 8.19+ for formal verification
 
 ## Quick Start
@@ -56,10 +63,10 @@ NeuroProof/
 
 ```bash
 cd NeuroProof
-python -c "from src import tauto, parse; p = tauto(parse('p -> p')); print(f'OK: size={p.size}')"
+python verify_installation.py
 ```
 
-Expected output: `OK: size=2`
+Expected output: `All tests passed! NeuroProof is correctly installed.` (under 10s, no dependencies needed)
 
 ### 2. Run Experiments
 
@@ -67,28 +74,27 @@ Run individual experiments:
 
 ```bash
 # EXP-4: Classical tautology proofs (fastest, ~1 second)
-python scripts/run_exp4_tautologies.py
+python experiments/benchmark_suite.py --exp 4
 
 # EXP-2: Pigeonhole Principle (~2 minutes)
-python scripts/run_exp2_pigeonhole.py
+python experiments/benchmark_suite.py --exp 2
 
 # EXP-5: ATSS online learning (~30 seconds)
-python scripts/run_exp5_atss_learning.py
+python experiments/benchmark_suite.py --exp 5
 
-# EXP-1: Random 3-CNF phase transition (~5 minutes)
-python scripts/run_exp1_phase_transition.py
-
-# EXP-3: Tseitin tautologies (~2 minutes)
-python scripts/run_exp3_tseitin.py
+# Run multiple experiments
+python experiments/benchmark_suite.py --exp 2,4,5
 ```
 
-Run all experiments at once:
+Run all experiments:
 
 ```bash
-python scripts/run_all_experiments.py
+python experiments/benchmark_suite.py --exp all
 ```
 
 Results are saved to `experiments/results.csv`.
+
+See [EXPERIMENTS.md](EXPERIMENTS.md) for detailed documentation of all 9 experiments.
 
 ### 3. Generate Plots (optional)
 
@@ -114,13 +120,13 @@ from src import Var, Not, And, Or, Implies, parse, tauto, decide, NeuroProofSolv
 # Parse and prove a tautology
 f = parse("(p -> q) -> ((not q) -> (not p))")  # contrapositive
 proof = tauto(f)
-print(f"Proof size: {proof.size}, depth: {proof.depth}")
+print(f"Proof size: {proof.size}, depth: {proof.depth}, verified: {proof.check()}")
 
 # SAT solving
 result = decide(parse("p | q"))
 print(f"Status: {result}")  # SAT
 
-# CNF solving via CDCL
+# CDCL solving via clause interface
 from src.solver import NeuroProofSolver, Clause
 solver = NeuroProofSolver(max_conflicts=10000)
 clauses = [
@@ -138,7 +144,7 @@ print(f"Status: {result.status}")
 
 The verification kernel (`kernel.py`, 287 lines) is intentionally minimal:
 - Each proof step is verified by pattern-matching against the rule definition
-- All other modules (ATSS, interpolation, tactic engine) produce `ProofStep` objects that pass through the kernel
+- All other modules (ATSS, interpolation, tactic engine, GNN) produce `ProofStep` objects that pass through the kernel
 - A bug in untrusted components cannot produce a false proof that passes verification
 
 ### ATSS (Adaptive Tactic Synthesis System)
@@ -148,22 +154,36 @@ The verification kernel (`kernel.py`, 287 lines) is intentionally minimal:
 - Cut formula selection by maximizing cosine similarity (sparse bag-of-subformulas)
 - Learns online during proof search, no pre-training required
 
+### GNN ATSS (optional)
+
+- 3-layer GIN (Graph Isomorphism Network) on bipartite variable-clause graphs
+- Online learning with experience replay buffer (size 64)
+- Blended scoring: 50% GNN + 50% cosine ATSS
+- Trained on GPU with Adam optimizer (lr=1e-3)
+
 ### CDCL Solver
 
 - Standard CDCL with 1-UIP conflict analysis and clause learning
 - ATSS-enriched VSIDS heuristic for variable selection
+- Luby restart sequence, phase saving, clause deletion
 - Craig interpolant extraction via Pudlak's algorithm
 - Proof logging via `ProofStep` DAG construction
 
 ## Experiments
 
-| Experiment | Description | Duration |
-|-----------|-------------|----------|
-| EXP-1 | Random 3-CNF phase transition (n=30, 20 trials/ratio) | ~5 min |
-| EXP-2 | Pigeonhole Principle PHP_n (n=2..6) | ~2 min |
-| EXP-3 | Tseitin tautologies (graph sizes 5-15) | ~2 min |
-| EXP-4 | 15 classical tautologies (proof quality) | ~1 sec |
-| EXP-5 | ATSS online learning curve (100 problems) | ~30 sec |
+| # | Name | Description | Est. Time |
+|---|------|-------------|----------|
+| 1 | Phase Transition | Random 3-CNF, ratio 2.0-6.0 | ~5-15 min |
+| 2 | Pigeonhole | PHP_n (n=2..6), hard UNSAT | ~2 min |
+| 3 | Tseitin | Graph-based Tseitin tautologies | ~2 min |
+| 4 | Proof Quality | 15 classical tautologies | ~1 sec |
+| 5 | ATSS Learning | Online learning convergence | ~30 sec |
+| 6 | Ablation | CDCL vs ATSS contribution | ~5 min |
+| 7 | Scalability | n_vars sweep at phase transition | ~5 min |
+| 8 | SOTA Comparison | PHP + 3-CNF vs baselines | ~3 min |
+| 9 | GNN ATSS | GNN vs cosine tactic selection | ~2 min (GPU) |
+
+See [EXPERIMENTS.md](EXPERIMENTS.md) for full reproduction instructions.
 
 ## Citation
 

@@ -3,16 +3,6 @@ plot_results.py
 ===============
 Generate publication-quality plots for the NeuroProof benchmark results.
 Requires: matplotlib, numpy, pandas.
-
-Figures:
-  1. Phase transition (EXP-1)
-  2. Pigeonhole principle (EXP-2)
-  3. Proof quality table (EXP-4)
-  4. ATSS learning curve (EXP-5)
-  5. Ablation study (EXP-6)
-  6. Scalability (EXP-7)
-  7. SOTA comparison (EXP-8)
-  8. Tseitin results (EXP-3)
 """
 
 from __future__ import annotations
@@ -21,7 +11,7 @@ import sys
 import pandas as pd
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg')   # non-interactive backend for servers
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.lines import Line2D
@@ -39,28 +29,31 @@ plt.rcParams.update({
     'figure.dpi':        150,
     'savefig.bbox':      'tight',
     'savefig.dpi':       300,
-    'text.usetex':       False,
+    'text.usetex':       False,   # set True if LaTeX installed
 })
 
 COLORS = {
-    'NeuroProof':       '#1f77b4',
-    'NeuroProof-Full':  '#1f77b4',
-    'NeuroProof+ATSS':  '#2ca02c',
-    'DPLL-Baseline':    '#ff7f0e',
-    'DPLL':             '#ff7f0e',
+    'NeuroProof':        '#1f77b4',
+    'DPLL-Baseline':     '#ff7f0e',
+    'NeuroProof+ATSS':   '#2ca02c',
 }
 MARKERS = {
-    'NeuroProof':       'o',
-    'NeuroProof-Full':  'o',
-    'NeuroProof+ATSS':  '^',
-    'DPLL-Baseline':    's',
-    'DPLL':             's',
+    'NeuroProof':        'o',
+    'DPLL-Baseline':     's',
+    'NeuroProof+ATSS':   '^',
 }
 
 
 def load_results(csv_path: str) -> pd.DataFrame:
     df = pd.read_csv(csv_path)
     return df
+
+
+def _save(fig, out_dir, name):
+    out = os.path.join(out_dir, name)
+    fig.savefig(out)
+    print(f"Saved: {out}")
+    plt.close(fig)
 
 
 # ── Figure 1: Phase Transition ────────────────────────────────────────────────
@@ -72,7 +65,7 @@ def plot_phase_transition(df: pd.DataFrame, out_dir: str) -> None:
     """
     data = df[df['name'].str.startswith('rand3cnf')].copy()
     if data.empty:
-        print("  [SKIP] No phase transition data")
+        print("  [SKIP] Fig 1: no rand3cnf data")
         return
 
     data['ratio'] = data['name'].str.extract(r'_r([\d.]+)').astype(float)
@@ -85,7 +78,9 @@ def plot_phase_transition(df: pd.DataFrame, out_dir: str) -> None:
         grouped = grp.groupby('ratio')['status']
         ratios = sorted(grouped.groups.keys())
         fracs = [
-            (grouped.get_group(r) == 'SAT').mean()
+            (grouped.get_group(r).isin(['SAT', 'UNSAT'])).mean()
+            if solver == 'DPLL-Baseline'
+            else (grouped.get_group(r).isin(['SAT', 'UNSAT'])).mean()
             for r in ratios
         ]
         ax.plot(ratios, fracs, marker=MARKERS.get(solver, 'o'),
@@ -93,9 +88,9 @@ def plot_phase_transition(df: pd.DataFrame, out_dir: str) -> None:
                 label=solver, linewidth=1.8, markersize=5)
 
     ax.axvline(4.267, color='gray', linestyle='--', alpha=0.6,
-               label='Phase transition ($\\alpha_c$ = 4.27)')
+               label='Phase transition ($\\alpha \\approx 4.27$)')
     ax.set_xlabel('Clause-to-variable ratio $\\alpha$')
-    ax.set_ylabel('Fraction SAT')
+    ax.set_ylabel('Fraction solved (SAT or UNSAT)')
     ax.set_title('(a) Phase Transition (n=30)')
     ax.legend(loc='lower left', fontsize=9)
     ax.set_xlim(2.0, 6.0)
@@ -105,10 +100,7 @@ def plot_phase_transition(df: pd.DataFrame, out_dir: str) -> None:
     # --- Right: Median solve time ---
     ax2 = axes[1]
     for solver, grp in data.groupby('solver'):
-        valid = grp[grp['status'].isin(['SAT', 'UNSAT'])]
-        if valid.empty:
-            continue
-        grouped = valid.groupby('ratio')['time_sec']
+        grouped = grp.groupby('ratio')['time_sec']
         ratios = sorted(grouped.groups.keys())
         medians = [grouped.get_group(r).median() * 1000 for r in ratios]
         ax2.semilogy(ratios, medians, marker=MARKERS.get(solver, 'o'),
@@ -124,19 +116,20 @@ def plot_phase_transition(df: pd.DataFrame, out_dir: str) -> None:
     ax2.grid(alpha=0.3, which='both')
 
     fig.tight_layout()
-    out = os.path.join(out_dir, 'fig1_phase_transition.pdf')
-    fig.savefig(out)
-    print(f"  Saved: {out}")
-    plt.close(fig)
+    _save(fig, out_dir, 'fig1_phase_transition.pdf')
 
 
 # ── Figure 2: Pigeonhole Principle ───────────────────────────────────────────
 
 def plot_pigeonhole(df: pd.DataFrame, out_dir: str) -> None:
-    """Fig 2: Proof size and solve time for PHP_n."""
-    data = df[df['name'].str.startswith('PHP_')].copy()
+    """Fig 2: Solve time and solve rate for PHP_n."""
+    data = df[df['name'].str.startswith('PHP_') &
+              ~df['name'].str.startswith('sota_PHP')].copy()
     if data.empty:
-        print("  [SKIP] No PHP data")
+        # Fall back to sota_PHP data
+        data = df[df['name'].str.startswith('PHP_')].copy()
+    if data.empty:
+        print("  [SKIP] Fig 2: no PHP data")
         return
 
     data['n'] = data['name'].str.extract(r'PHP_(\d+)').astype(int)
@@ -164,48 +157,47 @@ def plot_pigeonhole(df: pd.DataFrame, out_dir: str) -> None:
     ax.legend(fontsize=9)
     ax.grid(alpha=0.3, which='both')
 
-    # --- Right: Status breakdown ---
+    # --- Right: Solve rate ---
     ax2 = axes[1]
     for solver, grp in data.groupby('solver'):
         ns = sorted(grp['n'].unique())
-        sat_frac = []
+        rates = []
         for n in ns:
             sub = grp[grp['n'] == n]
             if len(sub) > 0:
-                sat_frac.append(1.0 if sub['status'].values[0] == 'UNSAT' else 0.0)
+                sat_unsat = sub['status'].isin(['SAT', 'UNSAT']).sum()
+                rates.append(sat_unsat / len(sub) * 100)
             else:
-                sat_frac.append(0.0)
-        ax2.bar([x + (0.15 if solver == 'NeuroProof' else 0) for x in ns],
-                sat_frac, width=0.15,
-                color=COLORS.get(solver, 'gray'),
-                label=solver, alpha=0.8)
+                rates.append(0)
+        ax2.plot(ns, rates, marker=MARKERS.get(solver, 'o'),
+                 color=COLORS.get(solver, 'gray'),
+                 label=solver, linewidth=1.8, markersize=6)
 
     ax2.set_xlabel('Number of holes $n$')
-    ax2.set_ylabel('Solve rate (UNSAT)')
+    ax2.set_ylabel('Solve rate (%)')
     ax2.set_title('(b) Pigeonhole: Solve Rate')
     ax2.legend(fontsize=9)
+    ax2.set_ylim(-5, 110)
     ax2.grid(alpha=0.3)
 
     fig.tight_layout()
-    out = os.path.join(out_dir, 'fig2_pigeonhole.pdf')
-    fig.savefig(out)
-    print(f"  Saved: {out}")
-    plt.close(fig)
+    _save(fig, out_dir, 'fig2_pigeonhole.pdf')
 
 
 # ── Figure 3: Proof Quality Table ─────────────────────────────────────────────
 
 def plot_proof_quality(df: pd.DataFrame, out_dir: str) -> None:
-    """Fig 3: Proof size/depth for classical tautologies."""
+    """Fig 3: Proof size/depth table for classical tautologies."""
     data = df[df['name'].str.startswith('tauto(')].copy()
     if data.empty:
-        print("  [SKIP] No proof quality data")
+        print("  [SKIP] Fig 3: no tauto data")
         return
 
     data['formula'] = data['name'].str.extract(r'tauto\((.+)\)')
     data = data[data['status'] == 'PROVED']
 
     if data.empty:
+        print("  [SKIP] Fig 3: no PROVED results")
         return
 
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -215,9 +207,9 @@ def plot_proof_quality(df: pd.DataFrame, out_dir: str) -> None:
     rows = []
     for _, row in data.iterrows():
         rows.append([
-            row['formula'][:40],
-            str(row['proof_size']),
-            str(row['proof_depth']),
+            row['formula'][:45],
+            str(int(row['proof_size'])),
+            str(int(row['proof_depth'])),
             f"{row['time_sec'] * 1000:.2f}"
         ])
 
@@ -226,7 +218,7 @@ def plot_proof_quality(df: pd.DataFrame, out_dir: str) -> None:
         colLabels=col_labels,
         cellLoc='center',
         loc='center',
-        colWidths=[0.5, 0.15, 0.15, 0.15]
+        colWidths=[0.50, 0.15, 0.15, 0.15]
     )
     table.auto_set_font_size(False)
     table.set_fontsize(9)
@@ -244,120 +236,149 @@ def plot_proof_quality(df: pd.DataFrame, out_dir: str) -> None:
     ax.set_title('Proof Quality on Classical Tautologies (NeuroProof+ATSS)',
                  fontsize=12, y=0.98)
 
-    out = os.path.join(out_dir, 'fig3_proof_quality.pdf')
-    fig.savefig(out)
-    print(f"  Saved: {out}")
-    plt.close(fig)
+    _save(fig, out_dir, 'fig3_proof_quality.pdf')
 
 
-# ── Figure 4: ATSS Learning Curve ──────────────────────────────────────────
+# ── Figure 4: ATSS Learning Curve ─────────────────────────────────────────────
 
-def plot_atss_learning(df: pd.DataFrame, out_dir: str) -> None:
+def plot_atss_learning_curve(df: pd.DataFrame, out_dir: str) -> None:
     """
-    Fig 4: ATSS online learning curve.
-    Since EXP-5 data is printed but not saved to CSV (shared state),
-    we create a synthetic figure from the known results.
-    """
-    # Known data from EXP-5 runs: 5 epochs, 20 problems each, 100% solve rate
-    epochs = [1, 2, 3, 4, 5]
-    solve_rates = [1.0, 1.0, 1.0, 1.0, 1.0]
-    avg_times = [0.6, 0.7, 0.8, 0.8, 0.6]  # ms per problem
+    Fig 4: ATSS online learning convergence.
 
+    Reads epoch data from the CSV (saved by EXP-5) and plots the
+    actual solve rate per epoch.
+    """
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
-    # Left: solve rate
-    ax = axes[0]
-    ax.bar(epochs, solve_rates, color='#2ca02c', alpha=0.8, width=0.6)
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Solve Rate')
-    ax.set_title('(a) ATSS Online Learning: Solve Rate')
-    ax.set_ylim(0, 1.1)
-    ax.set_xticks(epochs)
-    ax.grid(axis='y', alpha=0.3)
-    ax.axhline(1.0, color='gray', linestyle='--', alpha=0.5)
+    # Filter ATSS learning curve data
+    learning = df[df['name'] == 'atss_learning_curve'].copy()
+    if learning.empty:
+        print("  [SKIP] fig4: no ATSS learning curve data in CSV")
+        plt.close(fig)
+        return
 
-    # Right: average solve time
+    # --- Left: Solve rate per epoch ---
+    ax = axes[0]
+    epochs = learning['instance_id'].values
+    # proof_depth was repurposed to store solve_rate * 100
+    solve_rates = learning['proof_depth'].values.astype(float)
+    # decisions was repurposed to store solved count
+    solved_counts = learning['decisions'].values.astype(int)
+    # conflicts was repurposed to store failed count
+    failed_counts = learning['conflicts'].values.astype(int)
+    total_per_epoch = solved_counts + failed_counts
+
+    ax.plot(epochs + 1, solve_rates, 'o-', color='#2ca02c', markersize=4,
+            linewidth=1.5, label='ATSS solve rate')
+    ax.axhline(100, color='gray', linestyle='--', alpha=0.5,
+               label='Perfect (100%)')
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Solve rate (%)')
+    ax.set_title('(a) ATSS Solve Rate Convergence')
+    ax.set_ylim(0, 110)
+    ax.legend(fontsize=9)
+    ax.grid(alpha=0.3)
+
+    # --- Right: Solved count per epoch ---
     ax2 = axes[1]
-    ax2.plot(epochs, avg_times, 'o-', color='#2ca02c', linewidth=2, markersize=8)
+    ax2.bar(epochs + 1, solved_counts, color='#1f77b4', alpha=0.7,
+            label='Solved', edgecolor='black', linewidth=0.5)
+    ax2.bar(epochs + 1, failed_counts, bottom=solved_counts,
+            color='#d62728', alpha=0.7,
+            label='Failed', edgecolor='black', linewidth=0.5)
     ax2.set_xlabel('Epoch')
-    ax2.set_ylabel('Avg. Solve Time (ms)')
-    ax2.set_title('(b) ATSS Online Learning: Efficiency')
-    ax2.set_xticks(epochs)
-    ax2.grid(alpha=0.3)
+    ax2.set_ylabel('Problems')
+    ax2.set_title('(b) Solved / Failed per Epoch')
+    ax2.legend(fontsize=9)
+    ax2.grid(alpha=0.3, axis='y')
 
     fig.tight_layout()
-    out = os.path.join(out_dir, 'fig4_atss_learning.pdf')
-    fig.savefig(out)
-    print(f"  Saved: {out}")
-    plt.close(fig)
+    _save(fig, out_dir, 'fig4_atss_learning.pdf')
 
 
-# ── Figure 5: Ablation Study ────────────────────────────────────────────────
+# ── Figure 5: Ablation Study ──────────────────────────────────────────────────
 
 def plot_ablation(df: pd.DataFrame, out_dir: str) -> None:
     """
-    Fig 5: Ablation study — component contribution.
-    Compares NeuroProof-Full vs DPLL-Baseline on random 3-CNF.
+    Fig 5: Ablation study — NeuroProof vs DPLL-Baseline
+    at easy (ratio=2.0), phase transition (ratio=4.3), and hard (ratio=6.0).
     """
-    data = df[df['name'].str.startswith('ablation_rand')].copy()
-    if data.empty:
-        print("  [SKIP] No ablation data")
+    abl_data = df[df['name'].str.startswith('ablation_')].copy()
+
+    if abl_data.empty:
+        print("  [SKIP] Fig 5: no ablation data")
         return
+
+    abl_data['difficulty'] = abl_data['name'].map({
+        n: 'Easy (r=2.0)' if 'easy' in n
+        else 'Phase (r=4.3)' if 'phase' in n
+        else 'Hard (r=6.0)'
+        for n in abl_data['name']
+    })
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
-    # --- Left: Solve time comparison ---
+    # --- Left: Median solve time by difficulty ---
     ax = axes[0]
-    for solver, grp in data.groupby('solver'):
-        if solver not in COLORS:
-            continue
-        valid = grp[grp['status'].isin(['SAT', 'UNSAT'])]
-        if valid.empty:
-            continue
-        times = valid['time_sec'].values * 1000
-        label = solver.replace('NeuroProof-Full', 'NeuroProof (CDCL+ATSS)')
-        ax.barh([label], [times.mean()], xerr=[times.std()],
-                color=COLORS.get(solver, 'gray'), alpha=0.8, height=0.4)
+    difficulties = ['Easy (r=2.0)', 'Phase (r=4.3)', 'Hard (r=6.0)']
+    x = np.arange(len(difficulties))
+    width = 0.35
 
-    ax.set_xlabel('Average Solve Time (ms)')
-    ax.set_title('(a) Ablation: Solve Time')
-    ax.grid(axis='x', alpha=0.3)
+    for i, (solver, color) in enumerate(
+        [('NeuroProof', COLORS['NeuroProof']),
+         ('DPLL-Baseline', COLORS['DPLL-Baseline'])]):
+        grp = abl_data[abl_data['solver'] == solver]
+        times = []
+        for d in difficulties:
+            sub = grp[grp['difficulty'] == d]['time_sec'].values * 1000
+            times.append(np.median(sub) if len(sub) > 0 else 0)
+        ax.bar(x + i * width, times, width, color=color, alpha=0.8,
+               label=solver)
 
-    # --- Right: Status distribution ---
+    ax.set_xticks(x + width / 2)
+    ax.set_xticklabels(difficulties, fontsize=9)
+    ax.set_ylabel('Median solve time (ms)')
+    ax.set_title('(a) Solve Time by Difficulty')
+    ax.legend(fontsize=9)
+    ax.grid(alpha=0.3, axis='y')
+    ax.set_yscale('log')
+
+    # --- Right: Solve rate by difficulty ---
     ax2 = axes[1]
-    status_counts = data.groupby(['solver', 'status']).size().unstack(fill_value=0)
-    if 'SAT' in status_counts.columns and 'UNKNOWN' in status_counts.columns:
-        solvers = status_counts.index.tolist()
-        x = np.arange(len(solvers))
-        width = 0.35
-        sat_vals = status_counts.get('SAT', [0]*len(solvers)).values
-        unk_vals = status_counts.get('UNKNOWN', [0]*len(solvers)).values
-        bars1 = ax2.bar(x - width/2, sat_vals, width, label='SAT', color='#2ca02c', alpha=0.8)
-        bars2 = ax2.bar(x + width/2, unk_vals, width, label='UNKNOWN', color='#d62728', alpha=0.8)
-        ax2.set_xticks(x)
-        ax2.set_xticklabels([s.replace('NeuroProof-Full', 'NeuroProof') for s in solvers],
-                            rotation=15, ha='right')
-        ax2.set_ylabel('Number of Instances')
-        ax2.set_title('(b) Ablation: Status Distribution')
-        ax2.legend()
-        ax2.grid(axis='y', alpha=0.3)
+    for i, (solver, color) in enumerate(
+        [('NeuroProof', COLORS['NeuroProof']),
+         ('DPLL-Baseline', COLORS['DPLL-Baseline'])]):
+        grp = abl_data[abl_data['solver'] == solver]
+        rates = []
+        for d in difficulties:
+            sub = grp[grp['difficulty'] == d]
+            solved = sub['status'].isin(['SAT', 'UNSAT']).sum()
+            rates.append(solved / len(sub) * 100 if len(sub) > 0 else 0)
+        ax2.bar(x + i * width, rates, width, color=color, alpha=0.8,
+                label=solver)
+
+    ax2.set_xticks(x + width / 2)
+    ax2.set_xticklabels(difficulties, fontsize=9)
+    ax2.set_ylabel('Solve rate (%)')
+    ax2.set_title('(b) Solve Rate by Difficulty')
+    ax2.legend(fontsize=9)
+    ax2.set_ylim(0, 115)
+    ax2.grid(alpha=0.3, axis='y')
 
     fig.tight_layout()
-    out = os.path.join(out_dir, 'fig5_ablation.pdf')
-    fig.savefig(out)
-    print(f"  Saved: {out}")
-    plt.close(fig)
+    _save(fig, out_dir, 'fig5_ablation.pdf')
 
 
-# ── Figure 6: Scalability ──────────────────────────────────────────────────
+# ── Figure 6: Scalability ─────────────────────────────────────────────────────
 
 def plot_scalability(df: pd.DataFrame, out_dir: str) -> None:
     """
-    Fig 6: Solve time vs problem size at phase transition.
+    Fig 6: Solve time vs n_vars at phase transition ratio.
+    Shows median with IQR bands.
     """
     data = df[df['name'].str.startswith('scale_n')].copy()
     if data.empty:
-        print("  [SKIP] No scalability data")
+        print("  [SKIP] Fig 6: no scalability data")
         return
 
     data['n_vars'] = data['name'].str.extract(r'scale_n(\d+)').astype(int)
@@ -365,124 +386,148 @@ def plot_scalability(df: pd.DataFrame, out_dir: str) -> None:
     fig, ax = plt.subplots(figsize=(8, 5))
 
     for solver, grp in data.groupby('solver'):
-        grouped = grp.groupby('n_vars')['time_sec']
-        ns = sorted(grouped.groups.keys())
-        medians = [grouped.get_group(n).median() * 1000 for n in ns]
-        p25 = [grouped.get_group(n).quantile(0.25) * 1000 for n in ns]
-        p75 = [grouped.get_group(n).quantile(0.75) * 1000 for n in ns]
+        sizes = sorted(grp['n_vars'].unique())
+        medians = []
+        q25s = []
+        q75s = []
+        for s in sizes:
+            sub = grp[grp['n_vars'] == s]['time_sec'].values * 1000
+            if len(sub) > 0:
+                medians.append(np.median(sub))
+                q25s.append(np.percentile(sub, 25))
+                q75s.append(np.percentile(sub, 75))
+            else:
+                medians.append(float('nan'))
+                q25s.append(float('nan'))
+                q75s.append(float('nan'))
 
-        label = solver if solver != 'NeuroProof' else 'NeuroProof (CDCL+ATSS)'
-        ax.semilogy(ns, medians, marker=MARKERS.get(solver, 'o'),
-                    color=COLORS.get(solver, 'gray'),
-                    label=label, linewidth=2, markersize=8)
-        ax.fill_between(ns, p25, p75, alpha=0.15,
-                        color=COLORS.get(solver, 'gray'))
+        color = COLORS.get(solver, 'gray')
+        marker = MARKERS.get(solver, 'o')
+        ax.plot(sizes, medians, marker=marker, color=color,
+                label=solver, linewidth=2, markersize=6)
+        ax.fill_between(sizes, q25s, q75s, color=color, alpha=0.15)
 
-    ax.set_xlabel('Number of Variables ($n$)')
-    ax.set_ylabel('Solve Time (ms, log scale)')
+    ax.set_xlabel('Number of variables $n$')
+    ax.set_ylabel('Solve time (ms, median + IQR)')
     ax.set_title('Scalability at Phase Transition ($\\alpha = 4.267$)')
     ax.legend(fontsize=10)
-    ax.grid(alpha=0.3, which='both')
-    ax.set_xticks(sorted(data['n_vars'].unique()))
+    ax.grid(alpha=0.3)
+    ax.set_yscale('log')
 
     fig.tight_layout()
-    out = os.path.join(out_dir, 'fig6_scalability.pdf')
-    fig.savefig(out)
-    print(f"  Saved: {out}")
-    plt.close(fig)
+    _save(fig, out_dir, 'fig6_scalability.pdf')
 
 
-# ── Figure 7: SOTA Comparison ──────────────────────────────────────────────
+# ── Figure 7: SOTA Comparison ────────────────────────────────────────────────
 
 def plot_sota_comparison(df: pd.DataFrame, out_dir: str) -> None:
     """
-    Fig 7: SOTA comparison — DPLL vs NeuroProof+ATSS.
+    Fig 7: Head-to-head SOTA comparison — DPLL vs NeuroProof+ATSS
+    on PHP instances and random 3-CNF.
     """
-    data = df[df['name'].str.startswith('sota_')].copy()
-    if data.empty:
-        print("  [SKIP] No SOTA data")
+    sota_data = df[df['name'].str.startswith('sota_')].copy()
+    if sota_data.empty:
+        print("  [SKIP] Fig 7: no SOTA comparison data")
         return
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
-    # --- Left: PHP instances ---
-    ax = axes[0]
-    php = data[data['name'].str.startswith('sota_PHP')].copy()
-    if not php.empty:
-        php['n'] = php['name'].str.extract(r'sota_PHP_(\d+)').astype(int)
-        for solver, grp in php.groupby('solver'):
+    # Part A: PHP
+    php_data = sota_data[sota_data['name'].str.startswith('sota_PHP')].copy()
+    if not php_data.empty:
+        php_data['n'] = php_data['name'].str.extract(r'sota_PHP_(\d+)').astype(int)
+        ax = axes[0]
+
+        for solver, grp in php_data.groupby('solver'):
             ns = sorted(grp['n'].unique())
-            times = [grp[grp['n'] == n]['time_sec'].values[0] * 1000
-                     if len(grp[grp['n'] == n]) > 0 else float('nan') for n in ns]
-            label = solver if solver != 'NeuroProof+ATSS' else 'NeuroProof'
-            ax.semilogy(ns, times, marker=MARKERS.get(solver, 'o'),
-                        color=COLORS.get(solver, 'gray'),
-                        label=label, linewidth=1.8, markersize=6)
+            times = []
+            for n in ns:
+                sub = grp[grp['n'] == n]
+                if len(sub) > 0:
+                    times.append(sub['time_sec'].values[0] * 1000)
+                else:
+                    times.append(float('nan'))
+            ax.bar([n - 0.15 if solver == 'DPLL-Baseline' else n + 0.15 for n in ns],
+                   times, width=0.3,
+                   color=COLORS.get(solver, 'gray'), alpha=0.8,
+                   label=solver)
 
-    ax.set_xlabel('PHP instance size $n$')
-    ax.set_ylabel('Solve time (ms, log scale)')
-    ax.set_title('(a) PHP: DPLL vs NeuroProof')
-    ax.legend(fontsize=9)
-    ax.grid(alpha=0.3, which='both')
+        ax.set_xlabel('PHP$_n$')
+        ax.set_ylabel('Solve time (ms, log)')
+        ax.set_title('(a) Pigeonhole: DPLL vs NeuroProof')
+        ax.set_yscale('log')
+        ax.legend(fontsize=9)
+        ax.grid(alpha=0.3, axis='y')
 
-    # --- Right: Random 3-CNF ---
-    ax2 = axes[1]
-    rand = data[data['name'].str.startswith('sota_rand')].copy()
-    if not rand.empty:
-        rand['ratio'] = rand['name'].str.extract(r'sota_rand_r([\d.]+)').astype(float)
-        for solver, grp in rand.groupby('solver'):
+    # Part B: Random 3-CNF
+    rand_data = sota_data[sota_data['name'].str.startswith('sota_rand3cnf')].copy()
+    if not rand_data.empty:
+        rand_data['ratio'] = rand_data['name'].str.extract(
+            r'sota_rand3cnf_r([\d.]+)').astype(float)
+        ax2 = axes[1]
+
+        for solver, grp in rand_data.groupby('solver'):
             ratios = sorted(grp['ratio'].unique())
-            times = [grp[grp['ratio'] == r]['time_sec'].values[0] * 1000
-                     if len(grp[grp['ratio'] == r]) > 0 else float('nan') for r in ratios]
-            label = solver if solver != 'NeuroProof+ATSS' else 'NeuroProof'
-            ax2.semilogy(ratios, times, marker=MARKERS.get(solver, 'o'),
-                         color=COLORS.get(solver, 'gray'),
-                         label=label, linewidth=1.8, markersize=6)
+            medians = []
+            for r in ratios:
+                sub = grp[grp['ratio'] == r]['time_sec'].values * 1000
+                if len(sub) > 0:
+                    medians.append(np.median(sub))
+                else:
+                    medians.append(float('nan'))
+            ax2.plot(ratios, medians, marker=MARKERS.get(solver, 'o'),
+                     color=COLORS.get(solver, 'gray'),
+                     label=solver, linewidth=1.8, markersize=5)
 
-    ax2.set_xlabel('Clause-to-variable ratio $\\alpha$')
-    ax2.set_ylabel('Solve time (ms, log scale)')
-    ax2.set_title('(b) Random 3-CNF: DPLL vs NeuroProof')
-    ax2.legend(fontsize=9)
-    ax2.grid(alpha=0.3, which='both')
+        ax2.axvline(4.267, color='gray', linestyle='--', alpha=0.5)
+        ax2.set_xlabel('Ratio $\\alpha$')
+        ax2.set_ylabel('Median solve time (ms)')
+        ax2.set_title('(b) Random 3-CNF: DPLL vs NeuroProof')
+        ax2.legend(fontsize=9)
+        ax2.grid(alpha=0.3)
+        ax2.set_yscale('log')
 
     fig.tight_layout()
-    out = os.path.join(out_dir, 'fig7_sota_comparison.pdf')
-    fig.savefig(out)
-    print(f"  Saved: {out}")
-    plt.close(fig)
+    _save(fig, out_dir, 'fig7_sota_comparison.pdf')
 
 
-# ── Figure 8: Tseitin Results ────────────────────────────────────────────────
+# ── Figure 8: Tseitin Results ─────────────────────────────────────────────────
 
 def plot_tseitin(df: pd.DataFrame, out_dir: str) -> None:
-    """Fig 8: Tseitin tautology results."""
+    """Fig 8: Tseitin encoding solve time vs graph size."""
     data = df[df['name'].str.startswith('Tseitin_n')].copy()
     if data.empty:
-        print("  [SKIP] No Tseitin data")
+        print("  [SKIP] Fig 8: no Tseitin data")
         return
 
     data['n_verts'] = data['name'].str.extract(r'Tseitin_n(\d+)').astype(int)
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    valid = data[data['status'].isin(['SAT', 'UNSAT', 'UNKNOWN'])]
-    if not valid.empty:
-        grouped = valid.groupby('n_verts')['time_sec']
-        ns = sorted(grouped.groups.keys())
-        medians = [grouped.get_group(n).median() * 1000 for n in ns]
-        ax.bar([str(n) for n in ns], medians,
-                color='#1f77b4', alpha=0.8, width=0.6)
+    for solver, grp in data.groupby('solver'):
+        sizes = sorted(grp['n_verts'].unique())
+        medians = []
+        for s in sizes:
+            sub = grp[grp['n_verts'] == s]['time_sec'].values * 1000
+            if len(sub) > 0:
+                medians.append(np.median(sub))
+            else:
+                medians.append(float('nan'))
 
-    ax.set_xlabel('Number of Graph Vertices')
-    ax.set_ylabel('Median Solve Time (ms)')
-    ax.set_title('Tseitin Tautology: Solve Time vs Graph Size')
-    ax.grid(axis='y', alpha=0.3)
+        color = COLORS.get(solver, 'gray')
+        marker = MARKERS.get(solver, 'o')
+        ax.plot(sizes, medians, marker=marker, color=color,
+                label=solver, linewidth=2, markersize=6)
+
+    ax.set_xlabel('Graph size (vertices)')
+    ax.set_ylabel('Median solve time (ms)')
+    ax.set_title('Tseitin Tautology Performance')
+    ax.legend(fontsize=10)
+    ax.grid(alpha=0.3)
+    ax.set_yscale('log')
 
     fig.tight_layout()
-    out = os.path.join(out_dir, 'fig8_tseitin.pdf')
-    fig.savefig(out)
-    print(f"  Saved: {out}")
-    plt.close(fig)
+    _save(fig, out_dir, 'fig8_tseitin.pdf')
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -506,7 +551,7 @@ if __name__ == '__main__':
     plot_phase_transition(df, out_dir)
     plot_pigeonhole(df, out_dir)
     plot_proof_quality(df, out_dir)
-    plot_atss_learning(df, out_dir)
+    plot_atss_learning_curve(df, out_dir)
     plot_ablation(df, out_dir)
     plot_scalability(df, out_dir)
     plot_sota_comparison(df, out_dir)

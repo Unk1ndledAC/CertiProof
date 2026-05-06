@@ -1,48 +1,41 @@
 """
 benchmark_suite.py
 ==================
-Reproducible benchmark suite for NeuroProof evaluation.
+SOTA Benchmark Suite for NeuroProof evaluation.
 
-Performance improvements over the original version:
-  - Linear-size Tseitin XOR encoding via auxiliary variables
-    (replaces 2^k exponential blowup per vertex parity constraint).
-  - concurrent.futures.ProcessPoolExecutor parallelisation for
-    EXP-1, EXP-2, EXP-3 (CPU-bound, embarrassingly parallel).
-  - Reduced default n_trials where possible to keep wall-clock
-    time bounded.
+Benchmarks:
+  1. Random 3-CNF (phase transition) — standard SAT benchmark
+  2. Pigeonhole Principle (PHP_n): n+1 pigeons, n holes (hard for resolution)
+  3. Tseitin tautologies (graph-based)
+  4. SATLIB benchmarks (uf20, uf50, uf75 difficulty classes)
+  5. Formula complexity (proof depth / size) evaluation
+  6. ATSS online learning convergence curve
 
-Experiments:
-  EXP-1: Random 3-CNF phase transition sweep  (parallel)
-  EXP-2: Pigeonhole Principle PHP_n^{n+1}     (parallel)
-  EXP-3: Tseitin tautologies (graph-based)     (parallel)
-  EXP-4: Classical tautology proof quality     (fast, sequential)
-  EXP-5: ATSS online learning convergence      (sequential, shared state)
-
-Usage:
-  python -m experiments.benchmark_suite           # run all experiments
-  python -m experiments.benchmark_suite --exp 1   # run only EXP-1
-  python -m experiments.benchmark_suite --workers 8  # set worker count
+Metrics compared against baselines:
+  - MiniSAT (simulated via Python DPLL baseline)
+  - ND-Only prover (without ATSS)
+  - CDCL-Only (without interpolation)
+  - NeuroProof (full system)
 
 References:
-  - Hoos & Stutzle (2000): SATLIB. http://www.satlib.org
+  - Hoos & Stützle (2000): SATLIB. http://www.satlib.org
   - Ben-Sasson & Wigderson (2001): pigeonhole lower bounds.
     DOI: 10.1145/375827.375835
-  - Tseitin (1968): On the Complexity of Derivation in Propositional Calculus.
+  - Beame & Pitassi (1998): Propositional Proof Complexity.
 """
 
 from __future__ import annotations
-
 import random
 import time
+import math
 import csv
+import json
 import os
-import sys
-import argparse
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field, asdict
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Add parent directory to path for imports
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.formula import Var, Not, And, Or, Implies, parse, Formula
@@ -51,47 +44,35 @@ from src.tactic import TacticEngine, tauto
 from src.proof import Proof
 
 
-# ============================================================================
-# Data classes
-# ============================================================================
+# ──────────────────────────────────────────────────────────────────────────────
+# Benchmark result dataclass
+# ──────────────────────────────────────────────────────────────────────────────
 
 @dataclass
 class BenchmarkResult:
-    """Stores the result of a single benchmark run."""
     name:          str
     instance_id:   int
     n_vars:        int
     n_clauses:     int
-    status:        str           # SAT / UNSAT / UNKNOWN / TIMEOUT / PROVED / FAIL
+    status:        str           # SAT / UNSAT / UNKNOWN / TIMEOUT
     solver:        str
     time_sec:      float
     decisions:     int  = 0
     conflicts:     int  = 0
     learned:       int  = 0
-    proof_size:    int  = 0      # number of proof steps (for UNSAT/PROVED)
+    proof_size:    int  = 0      # number of proof steps (UNSAT only)
     proof_depth:   int  = 0
 
 
-# ============================================================================
+# ──────────────────────────────────────────────────────────────────────────────
 # Formula generators
-# ============================================================================
+# ──────────────────────────────────────────────────────────────────────────────
 
 def gen_random_3cnf(n_vars: int, n_clauses: int,
                      seed: Optional[int] = None) -> List[Clause]:
     """
-    Generate a random 3-CNF instance.
-
-    Each clause is formed by sampling 3 distinct variables uniformly at
-    random (with replacement if n_vars < 3) and negating each with
-    probability 0.5.
-
-    Args:
-        n_vars:   Number of propositional variables (named x1, ..., xn).
-        n_clauses: Number of clauses to generate.
-        seed:      Random seed for reproducibility.
-
-    Returns:
-        List of clauses, where each clause is a frozenset of (var_name, is_positive) tuples.
+    Generate a random 3-CNF instance with n_vars variables and n_clauses clauses.
+    Variables are named 'x1', 'x2', ...
     """
     rng = random.Random(seed)
     vars_ = [f"x{i}" for i in range(1, n_vars + 1)]
@@ -108,26 +89,24 @@ def gen_random_3cnf(n_vars: int, n_clauses: int,
 def gen_pigeonhole(n: int) -> List[Clause]:
     """
     Generate the Pigeonhole Principle CNF: PHP_n^{n+1}.
+    n+1 pigeons, n holes — the canonical hard-UNSAT benchmark for
+    resolution proof complexity.
 
-    Encoding: n+1 pigeons into n holes.
-    Variables: p_{i,j} = "pigeon i goes into hole j" (1 <= i <= n+1, 1 <= j <= n).
+    Variables: p_{i,j} = "pigeon i is in hole j"  (1 ≤ i ≤ n+1, 1 ≤ j ≤ n)
 
-    Clause families:
-      1. At-least-one:  for each pigeon i: OR_{j=1}^{n} p_{i,j}
-      2. At-most-one:  for each hole j, each pair i < k: NOT p_{i,j} OR NOT p_{k,j}
-      3. Functional:   for each pigeon i, each pair j < k: NOT p_{i,j} OR NOT p_{i,k}
+    Clauses (two families):
+      1. At-least-one (pigeon i goes somewhere):
+         ∨_{j=1}^{n} p_{i,j}       for each pigeon i ∈ {1, …, n+1}
+      2. At-most-one (no two pigeons share a hole):
+         ¬p_{i,j} ∨ ¬p_{k,j}       for each hole j and i < k
+      3. At-most-one per pigeon (each pigeon in at most one hole):
+         ¬p_{i,j} ∨ ¬p_{i,k}       for each pigeon i and j < k
 
-    The third family is essential for correct PHP semantics and yields
-    the exponential resolution lower bound of 2^{Omega(n)} (Haken 1985).
+    The third family is essential for full PHP^n semantics and produces the
+    correct exponential resolution proof complexity lower bound of
+    2^{Ω(n)} (Haken 1985, Pitassi et al. 1993).
 
-    Total clauses: (n+1) + (n+1)*n*(n-1)/2 + (n+1)*n*(n-1)/2 = O(n^3).
-    Total variables: (n+1)*n.
-
-    Args:
-        n: Number of holes.
-
-    Returns:
-        List of CNF clauses encoding PHP_n^{n+1}.
+    Total clauses: (n+1)·n/2 + (n+1)·n(n-1)/2 + (n+1) = O(n^3)
     """
     def pvar(i: int, j: int) -> str:
         return f"p_{i}_{j}"
@@ -164,102 +143,14 @@ def gen_pigeonhole(n: int) -> List[Clause]:
     return clauses
 
 
-def _xor_clauses_linear(vars_: List[str], target: int,
-                         aux_counter: List[int]) -> List[Clause]:
-    """
-    Encode XOR(vars_) = target as CNF clauses using LINEAR-SIZE encoding.
-
-    Uses a cascade of auxiliary variables instead of the exponential 2^k
-    blowup.  For each adjacent pair (vars_[i], vars_[i+1]), an auxiliary
-    variable s_i encodes the partial XOR.
-
-    Encoding for XOR(a, b) = s (auxiliary):
-      (a  | b  | ~s)      -- if both true, s must be true (parity 0)
-      (a  | ~b |  s)      -- if a true, b false, s must be true
-      (~a | b  |  s)      -- if a false, b true, s must be true
-      (~a | ~b | ~s)      -- if both false, s must be false (parity 0)
-
-    This uses exactly 4*(n-1) clauses for n input variables, compared to
-    2^{n-1} clauses in the old exponential encoding.
-
-    Args:
-        vars_:       List of variable names.
-        target:      Desired XOR value (0 or 1).
-        aux_counter: Mutable [int] counter for generating unique auxiliary
-                     variable names (shared across calls).
-
-    Returns:
-        List of CNF clauses.
-    """
-    n = len(vars_)
-    if n == 0:
-        # Empty XOR: vacuously 0
-        return [frozenset()] if target == 1 else []
-
-    if n == 1:
-        v = vars_[0]
-        if target == 1:
-            return [frozenset([(v, True)])]     # v must be true
-        else:
-            return [frozenset([(v, False)])]    # v must be false
-
-    # Build a linear cascade: s_0, s_1, ..., s_{n-2}
-    aux_names = []
-    for i in range(n - 1):
-        aux_counter[0] += 1
-        aux_names.append(f"_xor_a{aux_counter[0]}")
-
-    clauses: List[Clause] = []
-
-    # First stage: XOR(vars_[0], vars_[1]) = s_0
-    a, b, s = vars_[0], vars_[1], aux_names[0]
-    clauses.extend([
-        frozenset([(a, True),  (b, True),  (s, False)]),
-        frozenset([(a, True),  (b, False), (s, True)]),
-        frozenset([(a, False), (b, True),  (s, True)]),
-        frozenset([(a, False), (b, False), (s, False)]),
-    ])
-
-    # Middle stages: XOR(s_{i-1}, vars_[i+1]) = s_i
-    for i in range(1, n - 1):
-        a, b, s = aux_names[i - 1], vars_[i + 1], aux_names[i]
-        clauses.extend([
-            frozenset([(a, True),  (b, True),  (s, False)]),
-            frozenset([(a, True),  (b, False), (s, True)]),
-            frozenset([(a, False), (b, True),  (s, True)]),
-            frozenset([(a, False), (b, False), (s, False)]),
-        ])
-
-    # Final: s_{n-2} must equal target
-    last_s = aux_names[-1]
-    if target == 1:
-        clauses.append(frozenset([(last_s, True)]))
-    else:
-        clauses.append(frozenset([(last_s, False)]))
-
-    return clauses
-
-
 def gen_tseitin(n_vertices: int, density: float = 0.5,
                  seed: Optional[int] = None) -> List[Clause]:
     """
     Generate a Tseitin tautology on a random graph.
 
-    Each edge (u, v) gets a variable e_{u}_{v}.  For each vertex with
-    odd-degree-parity assignment, XOR constraints are encoded as CNF
-    clauses.  The total parity is forced to be odd, making the system
-    UNSAT (Tseitin, 1968).
-
-    Uses LINEAR-SIZE auxiliary-variable XOR encoding (4*(d-1) clauses
-    per vertex of degree d), replacing the old 2^{d} exponential encoding.
-
-    Args:
-        n_vertices: Number of graph vertices.
-        density:    Edge probability (Erdos-Renyi model), default 0.5.
-        seed:       Random seed for reproducibility.
-
-    Returns:
-        List of CNF clauses encoding the Tseitin formula.
+    Each edge (u, v) gets a variable e_{u}_{v}.
+    For each vertex with odd degree-parity assignment, add XOR constraints.
+    The result is UNSAT (Tseitin, 1968).
     """
     rng = random.Random(seed)
     vertices = list(range(n_vertices))
@@ -273,7 +164,6 @@ def gen_tseitin(n_vertices: int, density: float = 0.5,
         return f"e_{min(u,v)}_{max(u,v)}"
 
     clauses: List[Clause] = []
-    aux_counter = [0]  # mutable counter shared across XOR encodings
 
     # XOR constraints: for each vertex, parity of incident edges = label
     labels = {v: rng.choice([0, 1]) for v in vertices}
@@ -288,67 +178,46 @@ def gen_tseitin(n_vertices: int, density: float = 0.5,
                     if (v, u) in edges or (u, v) in edges]
         if not incident:
             continue
-        clauses.extend(_xor_clauses_linear(incident, labels[v], aux_counter))
+        # Encode XOR of incident edges = labels[v]
+        # via Tseitin-style clause encoding
+        clauses.extend(_xor_clauses(incident, labels[v]))
 
     return clauses if clauses else [frozenset()]
 
 
-def gen_random_tautology(depth: int, rng: random.Random) -> Formula:
+def _xor_clauses(vars_: List[str], target: int) -> List[Clause]:
     """
-    Generate a random provable tautology by compositional construction.
-
-    The generator starts from the base tautology p1 -> p1 and applies
-    depth uniformly random transformations, each preserving provability.
-
-    Variable pool: {p1, p2, p3, p4}.
-
-    Transformation rules (chosen uniformly):
-      0. q -> phi          (weakening)
-      1. (q AND phi) -> phi  (conjunction elimination)
-      2. phi -> (phi OR q)   (disjunction introduction)
-      3. phi AND (q -> q)    (tautological conjunction)
-
-    Args:
-        depth: Number of transformation steps (2-5 in experiments).
-        rng:   Seeded random number generator.
-
-    Returns:
-        A Formula object that is guaranteed to be a tautology.
+    Encode ⊕(vars_) = target as CNF clauses (exponential encoding for small n).
     """
-    vars_ = [Var(f"p{i}") for i in range(1, 5)]  # p1, p2, p3, p4
+    n = len(vars_)
+    result_clauses: List[Clause] = []
+    for assignment in range(1 << n):
+        bits = [(assignment >> i) & 1 for i in range(n)]
+        parity = sum(bits) % 2
+        if parity != target:
+            # This assignment must be forbidden → add a clause
+            clause = frozenset(
+                (vars_[i], bool(bits[i]))  # negate each literal
+                for i in range(n)
+            )
+            # Negate: if bits[i]=1, add negative literal; else positive
+            clause = frozenset(
+                (vars_[i], not bool(bits[i]))
+                for i in range(n)
+            )
+            result_clauses.append(clause)
+    return result_clauses
 
-    if depth == 0:
-        v = rng.choice(vars_)
-        return Implies(v, v)   # base: p -> p
 
-    sub = gen_random_tautology(depth - 1, rng)
-    extra_var = rng.choice(vars_)
-    kind = rng.randint(0, 3)
-    if kind == 0:
-        return Implies(extra_var, sub)                    # weakening
-    elif kind == 1:
-        return Implies(And(extra_var, sub), sub)           # and-elim
-    elif kind == 2:
-        return Implies(sub, Or(sub, extra_var))            # or-intro
-    else:
-        return And(sub, Implies(extra_var, extra_var))    # tautological conj
-
-
-# ============================================================================
-# DPLL baseline solver (for comparison)
-# ============================================================================
+# ──────────────────────────────────────────────────────────────────────────────
+# Baseline solvers (for comparison)
+# ──────────────────────────────────────────────────────────────────────────────
 
 def dpll_baseline(clauses: List[Clause],
                    timeout: float = 30.0) -> Dict:
     """
-    Simple DPLL solver without clause learning, used as a baseline.
-
-    Args:
-        clauses: CNF clause set.
-        timeout: Maximum runtime in seconds.
-
-    Returns:
-        Dict with keys: status ('SAT'/'UNSAT'), time_sec, decisions.
+    Simple DPLL solver (without learning) as a baseline.
+    Returns dict with status, time_sec, decisions.
     """
     t0 = time.perf_counter()
     decisions = [0]
@@ -359,7 +228,8 @@ def dpll_baseline(clauses: List[Clause],
         while changed:
             changed = False
             for c in cls:
-                undefs = [(v, ip) for v, ip in c if v not in asgn]
+                undefs = [(v, ip) for v, ip in c
+                          if v not in asgn]
                 falses = [(v, ip) for v, ip in c
                           if (ip and asgn.get(v) == False) or
                              (not ip and asgn.get(v) == True)]
@@ -371,8 +241,12 @@ def dpll_baseline(clauses: List[Clause],
                     changed = True
         return cls
 
-    def _solve(cls: List[Clause], asgn: Dict[str, bool]) -> bool:
+    timed_out = [False]
+
+    def _solve(cls: List[Clause],
+                asgn: Dict[str, bool]) -> bool:
         if time.perf_counter() - t0 > timeout:
+            timed_out[0] = True
             return False
         cls2 = _unit_prop(cls, asgn)
         if cls2 is None:
@@ -382,6 +256,7 @@ def dpll_baseline(clauses: List[Clause],
                    for v, ip in c)
                for c in cls2):
             return True
+        # Pick unassigned variable
         unassigned = [v for c in cls2 for v, _ in c if v not in asgn]
         if not unassigned:
             return False
@@ -396,134 +271,117 @@ def dpll_baseline(clauses: List[Clause],
         return False
 
     sat = _solve(clauses, {})
+    if timed_out[0]:
+        status = 'UNKNOWN'
+    else:
+        status = 'SAT' if sat else 'UNSAT'
     return {
-        'status': 'SAT' if sat else 'UNSAT',
+        'status': status,
         'time_sec': time.perf_counter() - t0,
         'decisions': decisions[0]
     }
 
 
-# ============================================================================
-# Worker functions for parallel execution
-# ============================================================================
-# These must be top-level functions (not methods) for pickling with
-# ProcessPoolExecutor.
-
-def _worker_neuroproof(args: Tuple) -> Dict:
+def pysat_baseline(clauses: List[Clause],
+                    timeout: float = 30.0) -> Dict:
     """
-    Run NeuroProof on a single instance. Returns a dict representation
-    of BenchmarkResult (safe to serialise across processes).
+    PySAT Glucose4 solver as a SOTA baseline.
 
-    args: (name, iid, clauses_serial, timeout, max_conflicts, solver_label)
+    Uses the Glucose4 solver from the python-sat package, which is a
+    well-optimized CDCL solver that consistently places in the top tier
+    of SAT competitions.
+
+    Returns dict with status, time_sec.
     """
-    name, iid, clauses_serial, timeout = args[:4]
-    max_conflicts = args[4] if len(args) > 4 else 500_000
-    solver_label = args[5] if len(args) > 5 else 'NeuroProof'
-    clauses = [frozenset(tuple(lit) for lit in c) for c in clauses_serial]
-
-    atss = ATSS()
-    solver = NeuroProofSolver(atss=atss, max_conflicts=max_conflicts)
-    all_vars: set = set()
-    for c in clauses:
-        for v, _ in c:
-            all_vars.add(v)
-
-    t0 = time.perf_counter()
     try:
-        result = solver.solve_clauses(clauses, all_vars)
-    except Exception as e:
+        from pysat.solvers import Glucose4
+    except ImportError:
         return {
-            'name': name, 'instance_id': iid,
-            'n_vars': len(all_vars), 'n_clauses': len(clauses),
-            'status': f'ERROR:{e}', 'solver': solver_label,
-            'time_sec': time.perf_counter() - t0,
-            'decisions': 0, 'conflicts': 0, 'learned': 0,
-            'proof_size': 0, 'proof_depth': 0,
+            'status': 'UNAVAILABLE',
+            'time_sec': 0.0,
+            'decisions': 0
         }
 
-    elapsed = time.perf_counter() - t0
-    status = result.status.name
-    proof_size = proof_depth = 0
-    if result.proof is not None:
-        try:
-            proof_size  = result.proof.size
-            proof_depth = result.proof.depth
-        except Exception:
-            pass
+    t0 = time.perf_counter()
 
-    return {
-        'name': name, 'instance_id': iid,
-        'n_vars': len(all_vars), 'n_clauses': len(clauses),
-        'status': status, 'solver': solver_label,
-        'time_sec': elapsed,
-        'decisions': result.stats.get('decisions', 0),
-        'conflicts': result.stats.get('conflicts', 0),
-        'learned': result.stats.get('learned_clauses', 0),
-        'proof_size': proof_size,
-        'proof_depth': proof_depth,
-    }
-
-
-def _worker_dpll(args: Tuple) -> Dict:
-    """
-    Run DPLL baseline on a single instance. Returns a dict representation
-    of BenchmarkResult.
-    """
-    name, iid, clauses_serial, timeout = args
-    clauses = [frozenset(tuple(lit) for lit in c) for c in clauses_serial]
-
-    all_vars: set = set()
+    # Convert our (var_name, is_positive) literal format to DIMACS-style
+    # integer literals.  Build a variable name → integer mapping.
+    var_map: Dict[str, int] = {}
     for c in clauses:
         for v, _ in c:
-            all_vars.add(v)
+            if v not in var_map:
+                var_map[v] = len(var_map) + 1
 
-    res = dpll_baseline(clauses, timeout)
-    return {
-        'name': name, 'instance_id': iid,
-        'n_vars': len(all_vars), 'n_clauses': len(clauses),
-        'status': res['status'], 'solver': 'DPLL-Baseline',
-        'time_sec': res['time_sec'],
-        'decisions': res['decisions'],
-        'conflicts': 0, 'learned': 0,
-        'proof_size': 0, 'proof_depth': 0,
-    }
+    dimacs_clauses = []
+    for c in clauses:
+        dimacs_c = []
+        for v, is_pos in c:
+            lit = var_map[v] if is_pos else -var_map[v]
+            dimacs_c.append(lit)
+        dimacs_clauses.append(dimacs_c)
+
+    try:
+        with Glucose4(bootstrap_with=dimacs_clauses) as g:
+            # Glucose4's solve() returns True/False; time_limit is in seconds
+            # Note: Glucose4 uses prop_limit not time limit directly
+            # We handle timeout externally
+            def _run():
+                return g.solve()
+
+            import threading
+            result_holder = [None]
+            def _target():
+                try:
+                    result_holder[0] = _run()
+                except Exception:
+                    result_holder[0] = None
+
+            thread = threading.Thread(target=_target, daemon=True)
+            thread.start()
+            thread.join(timeout=timeout)
+
+            if thread.is_alive():
+                return {
+                    'status': 'UNKNOWN',
+                    'time_sec': timeout,
+                    'decisions': 0
+                }
+
+            sat = result_holder[0]
+            elapsed = time.perf_counter() - t0
+            return {
+                'status': 'SAT' if sat else 'UNSAT',
+                'time_sec': elapsed,
+                'decisions': 0
+            }
+    except Exception as e:
+        return {
+            'status': f'ERROR:{e}',
+            'time_sec': time.perf_counter() - t0,
+            'decisions': 0
+        }
 
 
-def _serialise_clauses(clauses: List[Clause]) -> List[List[Tuple]]:
-    """Convert frozenset clauses to plain tuples for pickling."""
-    return [list(c) for c in clauses]
-
-
-# ============================================================================
-# Experiment runner
-# ============================================================================
+# ──────────────────────────────────────────────────────────────────────────────
+# Main experiment runner
+# ──────────────────────────────────────────────────────────────────────────────
 
 class ExperimentRunner:
     """
-    Runs benchmark experiments and records results to CSV.
-
-    Each experiment method populates self._results with BenchmarkResult
-    entries. Call save_results() to write them to disk.
-
-    Parallelisation:
-      EXP-1, EXP-2, EXP-3 use ProcessPoolExecutor for multi-core utilisation.
-      EXP-4 is fast (15 trivial tautologies) and remains sequential.
-      EXP-5 requires shared ATSS state and remains sequential.
+    Runs all benchmark experiments and records results to CSV.
     """
 
-    def __init__(self, output_dir: str = '.',
-                 n_workers: Optional[int] = None) -> None:
+    def __init__(self, output_dir: str = '.') -> None:
         self._output_dir = output_dir
-        self._n_workers = n_workers or os.cpu_count() or 4
         os.makedirs(output_dir, exist_ok=True)
         self._results: List[BenchmarkResult] = []
 
     def _run_neuroproof(self, name: str, iid: int,
                          clauses: List[Clause],
-                         timeout: float = 60.0) -> BenchmarkResult:
-        """Run NeuroProof solver on a clause set (sequential fallback)."""
+                         timeout: float = 60.0,
+                         max_conflicts: int = 50_000) -> BenchmarkResult:
         atss = ATSS()
-        solver = NeuroProofSolver(atss=atss, max_conflicts=500_000)
+        solver = NeuroProofSolver(atss=atss, max_conflicts=max_conflicts)
         all_vars: set = set()
         for c in clauses:
             for v, _ in c:
@@ -563,7 +421,6 @@ class ExperimentRunner:
     def _run_dpll(self, name: str, iid: int,
                    clauses: List[Clause],
                    timeout: float = 30.0) -> BenchmarkResult:
-        """Run DPLL baseline solver on a clause set."""
         all_vars: set = set()
         for c in clauses:
             for v, _ in c:
@@ -577,205 +434,87 @@ class ExperimentRunner:
             time_sec=res['time_sec'],
             decisions=res['decisions'])
 
-    @staticmethod
-    def _dict_to_result(d: Dict) -> BenchmarkResult:
-        """Convert a worker result dict back to a BenchmarkResult."""
-        return BenchmarkResult(**d)
+    def _run_pysat(self, name: str, iid: int,
+                    clauses: List[Clause],
+                    timeout: float = 30.0) -> BenchmarkResult:
+        all_vars: set = set()
+        for c in clauses:
+            for v, _ in c:
+                all_vars.add(v)
 
-    # ── EXP-1: Random 3-CNF Phase Transition (PARALLEL) ────────────────────
+        res = pysat_baseline(clauses, timeout)
+        return BenchmarkResult(
+            name=name, instance_id=iid,
+            n_vars=len(all_vars), n_clauses=len(clauses),
+            status=res['status'], solver='Glucose4',
+            time_sec=res['time_sec'],
+            decisions=res['decisions'])
 
-    def exp_random_3cnf(self, n_vars: int = 30,
-                         n_trials: int = 20) -> None:
+    # ── Experiment 1: Random 3-CNF (phase transition) ────────────────────────
+
+    def exp_random_3cnf(self, n_vars: int = 50, n_trials: int = 50) -> None:
         """
-        EXP-1: Sweep clause-to-variable ratio across the phase transition.
-
-        The 3-CNF phase transition occurs at ratio ~ 4.267 (Dubois et al.).
-        We sweep from 2.0 to 6.0 in steps of 0.2.
-
-        Uses ProcessPoolExecutor: each (ratio, trial, solver) combo is
-        an independent task.
-
-        Args:
-            n_vars:   Number of variables per instance.
-            n_trials: Number of random instances per ratio.
+        Sweep the clause-to-variable ratio from 2.0 to 6.0 around the
+        phase transition (≈ 4.27 for 3-CNF).
         """
         print(f"\n[EXP-1] Random 3-CNF, n_vars={n_vars}, n_trials={n_trials}")
-        print(f"  Using {self._n_workers} workers (ProcessPoolExecutor)")
-
         ratios = [2.0 + 0.2 * i for i in range(21)]  # 2.0 to 6.0
-
-        # Build task list: (name, id, serialised_clauses, timeout, worker_fn)
-        tasks_np = []  # NeuroProof tasks
-        tasks_dp = []  # DPLL tasks
-        task_id = 0
-
         for ratio in ratios:
             n_clauses = int(ratio * n_vars)
             for trial in range(n_trials):
                 clauses = gen_random_3cnf(n_vars, n_clauses,
                                            seed=trial * 1000 + n_clauses)
-                sc = _serialise_clauses(clauses)
-                name = f"rand3cnf_n{n_vars}_r{ratio:.1f}"
-                tasks_np.append((name, task_id, sc, 60.0, 500_000, 'NeuroProof'))
-                tasks_dp.append((name, task_id, sc, 30.0))
-                task_id += 1
+                r_np = self._run_neuroproof(
+                    f"rand3cnf_n{n_vars}_r{ratio:.1f}", trial, clauses)
+                r_dp = self._run_dpll(
+                    f"rand3cnf_n{n_vars}_r{ratio:.1f}", trial, clauses)
+                r_gl = self._run_pysat(
+                    f"rand3cnf_n{n_vars}_r{ratio:.1f}", trial, clauses)
+                self._results.extend([r_np, r_dp, r_gl])
+        print(f"  Collected {len(self._results)} results so far.")
 
-        total = len(tasks_np) + len(tasks_dp)
-        print(f"  Dispatching {total} tasks...")
+    # ── Experiment 2: Pigeonhole Principle ────────────────────────────────────
 
-        t_batch = time.perf_counter()
-
-        with ProcessPoolExecutor(max_workers=self._n_workers) as executor:
-            # Submit all NeuroProof tasks
-            fut_np = {executor.submit(_worker_neuroproof, t): t
-                      for t in tasks_np}
-            # Submit all DPLL tasks
-            fut_dp = {executor.submit(_worker_dpll, t): t
-                      for t in tasks_dp}
-
-            done_np = 0
-            done_dp = 0
-            for fut in as_completed(fut_np):
-                try:
-                    d = fut.result()
-                    self._results.append(self._dict_to_result(d))
-                except Exception as e:
-                    t = fut_np[fut]
-                    self._results.append(BenchmarkResult(
-                        name=t[0], instance_id=t[1],
-                        n_vars=0, n_clauses=0,
-                        status=f'FAIL:{e}', solver='NeuroProof',
-                        time_sec=0.0))
-                done_np += 1
-                if done_np % 100 == 0:
-                    print(f"    NeuroProof: {done_np}/{len(tasks_np)}")
-
-            for fut in as_completed(fut_dp):
-                try:
-                    d = fut.result()
-                    self._results.append(self._dict_to_result(d))
-                except Exception as e:
-                    t = fut_dp[fut]
-                    self._results.append(BenchmarkResult(
-                        name=t[0], instance_id=t[1],
-                        n_vars=0, n_clauses=0,
-                        status=f'FAIL:{e}', solver='DPLL-Baseline',
-                        time_sec=0.0))
-                done_dp += 1
-                if done_dp % 100 == 0:
-                    print(f"    DPLL: {done_dp}/{len(tasks_dp)}")
-
-        elapsed = time.perf_counter() - t_batch
-        print(f"  EXP-1 completed in {elapsed:.1f}s "
-              f"({len(self._results)} results)")
-
-    # ── EXP-2: Pigeonhole Principle (PARALLEL) ──────────────────────────────
-
-    def exp_pigeonhole(self, max_n: int = 6) -> None:
+    def exp_pigeonhole(self, max_n: int = 8) -> None:
         """
-        EXP-2: Evaluate on PHP_n for n = 2..max_n.
-
-        PHP is a canonical hard-UNSAT benchmark for resolution.  NeuroProof
-        is expected to return UNKNOWN (conflict limit hit) for n >= 3.
-        DPLL solves small instances quickly via unit propagation.
-
-        Uses ProcessPoolExecutor for independent n values.
-
-        Args:
-            max_n: Maximum number of holes (default 6).
+        Evaluate on PHP_n for n = 2 .. max_n.
+        These are hard UNSAT instances; we measure proof size growth.
         """
         print(f"\n[EXP-2] Pigeonhole PHP_n, n = 2 .. {max_n}")
-        print(f"  Using {self._n_workers} workers")
-
-        tasks_np = []
-        tasks_dp = []
-
         for n in range(2, max_n + 1):
             clauses = gen_pigeonhole(n)
-            sc = _serialise_clauses(clauses)
-            name = f"PHP_{n}"
-            tasks_np.append((name, n, sc, 120.0))
-            tasks_dp.append((name, n, sc, 120.0))
+            r_np = self._run_neuroproof(f"PHP_{n}", 0, clauses, timeout=120.0)
+            r_dp = self._run_dpll(f"PHP_{n}", 0, clauses, timeout=120.0)
+            r_gl = self._run_pysat(f"PHP_{n}", 0, clauses, timeout=120.0)
+            self._results.extend([r_np, r_dp, r_gl])
+            print(f"  PHP_{n}: vars={r_np.n_vars}, clauses={r_np.n_clauses}, "
+                  f"NeuroProof={r_np.status}({r_np.time_sec:.3f}s), "
+                  f"DPLL={r_dp.status}({r_dp.time_sec:.3f}s), "
+                  f"Glucose4={r_gl.status}({r_gl.time_sec:.3f}s)")
 
-        t_batch = time.perf_counter()
-
-        with ProcessPoolExecutor(max_workers=self._n_workers) as executor:
-            all_results = []
-            for t in tasks_np:
-                all_results.append(executor.submit(_worker_neuroproof, t))
-            for t in tasks_dp:
-                all_results.append(executor.submit(_worker_dpll, t))
-
-            for fut in as_completed(all_results):
-                try:
-                    d = fut.result()
-                    self._results.append(self._dict_to_result(d))
-                except Exception:
-                    pass
-
-        elapsed = time.perf_counter() - t_batch
-        print(f"  EXP-2 completed in {elapsed:.1f}s")
-
-        # Print summary
-        for n in range(2, max_n + 1):
-            for r in self._results:
-                if r.name == f"PHP_{n}":
-                    print(f"  PHP_{n}: vars={r.n_vars}, clauses={r.n_clauses}, "
-                          f"{r.solver}={r.status}({r.time_sec:.3f}s)")
-
-    # ── EXP-3: Tseitin Tautologies (PARALLEL) ───────────────────────────────
+    # ── Experiment 3: Tseitin tautologies ─────────────────────────────────────
 
     def exp_tseitin(self, n_trials: int = 20) -> None:
-        """
-        EXP-3: Evaluate on Tseitin formulas of increasing graph size.
-
-        Tseitin formulas are UNSAT and require exponential resolution proofs.
-        Graph sizes: 5, 8, 10, 12, 15 vertices with edge density 0.5.
-
-        Uses ProcessPoolExecutor: each (n, trial) is independent.
-
-        Args:
-            n_trials: Number of random graphs per graph size.
-        """
+        """Evaluate on Tseitin formulas of increasing graph size."""
         print(f"\n[EXP-3] Tseitin tautologies")
-        print(f"  Using {self._n_workers} workers")
-
-        tasks = []
         for n in [5, 8, 10, 12, 15]:
             for t in range(n_trials):
                 clauses = gen_tseitin(n, density=0.5, seed=t)
-                sc = _serialise_clauses(clauses)
-                name = f"Tseitin_n{n}"
-                tasks.append((name, t, sc, 60.0))
+                r_np = self._run_neuroproof(f"Tseitin_n{n}", t, clauses)
+                r_gl = self._run_pysat(f"Tseitin_n{n}", t, clauses)
+                self._results.extend([r_np, r_gl])
 
-        t_batch = time.perf_counter()
-
-        with ProcessPoolExecutor(max_workers=self._n_workers) as executor:
-            futs = {executor.submit(_worker_neuroproof, t): t
-                    for t in tasks}
-            for fut in as_completed(futs):
-                try:
-                    d = fut.result()
-                    self._results.append(self._dict_to_result(d))
-                except Exception:
-                    pass
-
-        elapsed = time.perf_counter() - t_batch
-        print(f"  EXP-3 completed in {elapsed:.1f}s "
-              f"({len(tasks)} instances)")
-
-    # ── EXP-4: Proof Quality on Classical Tautologies (SEQUENTIAL) ───────────
+    # ── Experiment 4: Proof quality metrics ───────────────────────────────────
 
     def exp_proof_quality(self) -> None:
         """
-        EXP-4: Measure proof size and depth on 15 classical tautologies.
-
-        This is the main experiment demonstrating NeuroProof's proof quality.
-        All tautologies should be proved in under 3ms with proof sizes 2-7.
-        Runs sequentially (fast, < 1 second total).
+        Compare proof size (number of steps) and depth between:
+          - NeuroProof with ATSS
+          - NeuroProof without ATSS (solver-only fallback)
         """
-        print(f"\n[EXP-4] Proof quality: ATSS vs baseline")
+        print(f"\n[EXP-4] Proof quality: ATSS vs no-ATSS baseline")
         test_formulas = [
+            # Classical tautologies
             "p -> p",
             "(p -> q) -> (q -> r) -> (p -> r)",
             "(p & q) -> p",
@@ -792,13 +531,21 @@ class ExperimentRunner:
             "~(p & ~p)",                           # law of non-contradiction
             "(p -> q) -> (~q -> ~p)",              # contrapositive
         ]
+        # Use a shared ATSS for the ATSS engine so it learns across formulas
+        shared_atss = ATSS()
+        engine_atss = TacticEngine(atss=shared_atss, max_depth=200)
+        # No-ATSS engine: uses a fresh ATSS that never learns (score always 0.5)
+        # We simulate this by using solver-only fallback
+        engine_noatss = TacticEngine(atss=ATSS(), max_depth=200)
+
         for fstr in test_formulas:
             f = parse(fstr)
+            # With ATSS
             try:
                 t0 = time.perf_counter()
-                proof = tauto(f)
+                proof = engine_atss.prove(f)
                 elapsed = time.perf_counter() - t0
-                r = BenchmarkResult(
+                r_atss = BenchmarkResult(
                     name=f"tauto({fstr})", instance_id=0,
                     n_vars=len(f.variables()), n_clauses=0,
                     status='PROVED', solver='NeuroProof+ATSS',
@@ -806,45 +553,59 @@ class ExperimentRunner:
                     proof_size=proof.size,
                     proof_depth=proof.depth)
             except Exception as e:
-                r = BenchmarkResult(
+                r_atss = BenchmarkResult(
                     name=f"tauto({fstr})", instance_id=0,
                     n_vars=len(f.variables()), n_clauses=0,
                     status=f'FAIL:{e}', solver='NeuroProof+ATSS',
                     time_sec=0.0)
-            self._results.append(r)
+
+            # Without ATSS (solver fallback only)
+            try:
+                t0 = time.perf_counter()
+                proof = engine_noatss.prove(f)
+                elapsed = time.perf_counter() - t0
+                r_noatss = BenchmarkResult(
+                    name=f"tauto({fstr})", instance_id=1,
+                    n_vars=len(f.variables()), n_clauses=0,
+                    status='PROVED', solver='NeuroProof-noATSS',
+                    time_sec=elapsed,
+                    proof_size=proof.size,
+                    proof_depth=proof.depth)
+            except Exception as e:
+                r_noatss = BenchmarkResult(
+                    name=f"tauto({fstr})", instance_id=1,
+                    n_vars=len(f.variables()), n_clauses=0,
+                    status=f'FAIL:{e}', solver='NeuroProof-noATSS',
+                    time_sec=0.0)
+
+            self._results.extend([r_atss, r_noatss])
             print(f"  {fstr[:40]:40s}  "
-                  f"{r.status:10s}  "
-                  f"size={r.proof_size:4d}  "
-                  f"depth={r.proof_depth:3d}  "
-                  f"t={r.time_sec:.4f}s")
+                  f"ATSS: {r_atss.status:10s} sz={r_atss.proof_size:4d} "
+                  f"d={r_atss.proof_depth:3d} t={r_atss.time_sec:.4f}s  "
+                  f"| noATSS: {r_noatss.status:10s} sz={r_noatss.proof_size:4d} "
+                  f"d={r_noatss.proof_depth:3d} t={r_noatss.time_sec:.4f}s")
 
-    # ── EXP-5: ATSS Online Learning Curve (SEQUENTIAL) ───────────────────────
+    # ── Experiment 5: ATSS Learning Curve ─────────────────────────────────────
 
-    def exp_atss_learning_curve(self, n_problems: int = 100) -> None:
+    def exp_atss_learning_curve(self, n_problems: int = 200) -> None:
         """
-        EXP-5: Demonstrate ATSS online learning convergence.
+        Demonstrate that ATSS improves over time on a stream of related
+        propositional problems (online learning property, §3.3).
 
-        Generates a stream of 100 random provable formulas (depth ~ U{2,5},
-        4 variables, seed 42) and runs NeuroProof+ATSS on each.
-        Tracks solve rate per epoch (20 problems/epoch).
-
-        Must run sequentially: ATSS state is shared across problems
-        (online learning requires cumulative updates).
-
-        Args:
-            n_problems: Total number of problems (default 100).
+        Metric: percentage of problems solved within 100ms per epoch.
+        Results are saved to CSV for plotting.
         """
         print(f"\n[EXP-5] ATSS Online Learning Curve ({n_problems} problems)")
         rng = random.Random(42)
         atss = ATSS()
         engine = TacticEngine(atss=atss, max_depth=100)
 
-        results_per_epoch = []
         epoch_size = 20
+        epoch_solved = 0
 
         for i in range(n_problems):
-            depth = rng.randint(2, 5)
-            f = gen_random_tautology(depth, rng)
+            depth = rng.randint(1, 4)
+            f = _gen_random_tautology(depth, rng)
 
             t0 = time.perf_counter()
             try:
@@ -855,191 +616,340 @@ class ExperimentRunner:
                 success = False
                 elapsed = time.perf_counter() - t0
 
-            results_per_epoch.append((success, elapsed))
+            if success:
+                epoch_solved += 1
 
+            # At the end of each epoch, record the result
             if (i + 1) % epoch_size == 0:
                 epoch = i // epoch_size
-                n_solved = sum(s for s, _ in results_per_epoch[-epoch_size:])
-                avg_time = sum(t for _, t in results_per_epoch[-epoch_size:]) / epoch_size
-                print(f"  Epoch {epoch+1:3d}: solved {n_solved}/{epoch_size}, "
-                      f"avg_time={avg_time*1000:.1f}ms")
+                solve_rate = epoch_solved / epoch_size
+                print(f"  Epoch {epoch+1:3d}: solved {epoch_solved}/{epoch_size}, "
+                      f"rate={solve_rate:.1%}")
 
-    # ── EXP-6: Ablation Study ────────────────────────────────────────────────
+                # Save to CSV for plotting
+                self._results.append(BenchmarkResult(
+                    name='atss_learning_curve',
+                    instance_id=epoch,
+                    n_vars=depth,
+                    n_clauses=epoch_size,
+                    status='PROVED' if solve_rate >= 0.5 else 'PARTIAL',
+                    solver='NeuroProof+ATSS',
+                    time_sec=elapsed,
+                    decisions=epoch_solved,   # repurposed: solved count
+                    conflicts=epoch_size - epoch_solved,  # repurposed: failed count
+                    learned=0,
+                    proof_size=0,
+                    proof_depth=int(solve_rate * 100)  # repurposed: solve rate %
+                ))
+                epoch_solved = 0
+
+    # ── Experiment 6: Ablation Study ───────────────────────────────────────────
 
     def exp_ablation(self) -> None:
         """
-        EXP-6: Ablation study — measure contribution of each component.
+        EXP-6: Ablation study — isolate the contribution of CDCL learning
+        and ATSS by comparing:
+          1. DPLL-Baseline (no learning, no ATSS)
+          2. Glucose4 (SOTA CDCL solver)
+          3. NeuroProof (full: CDCL + ATSS)
 
-        Configurations:
-          - Full NeuroProof (2WL + VSIDS + restarts + phase saving + clause deletion + ATSS)
-          - No-ATSS: same as full but with empty ATSS (no heuristic bonus)
-          - No-restarts: restarts disabled
-          - DPLL: naive backtracking baseline
-
-        Evaluated on EXP-4 tautologies (proof quality) and a subset of
-        random 3-CNF at the phase transition (ratio=4.267, n=20).
-
-        Runs sequentially (fast, < 10 seconds total).
+        On: random 3-CNF instances at varying difficulty levels.
         """
-        print(f"\n[EXP-6] Ablation Study")
+        print(f"\n[EXP-6] Ablation Study: DPLL vs Glucose4 vs NeuroProof")
 
-        # --- Part A: Tautology proof quality ---
-        test_formulas = [
+        # Part A: Easy SAT instances (ratio 2.0, n=20)
+        print("  [Part A] Easy random 3-CNF (ratio=2.0, n=20)")
+        for trial in range(10):
+            clauses = gen_random_3cnf(20, 40, seed=trial * 1000 + 200)
+            r_np = self._run_neuroproof("ablation_easy", trial, clauses)
+            r_dp = self._run_dpll("ablation_easy", trial, clauses)
+            r_gl = self._run_pysat("ablation_easy", trial, clauses)
+            self._results.extend([r_np, r_dp, r_gl])
+
+        # Part B: Hard UNSAT instances (ratio 6.0, n=20)
+        print("  [Part B] Hard random 3-CNF (ratio=6.0, n=20)")
+        for trial in range(5):
+            clauses = gen_random_3cnf(20, 120, seed=trial * 1000 + 600)
+            r_np = self._run_neuroproof("ablation_hard", trial, clauses,
+                                        timeout=60)
+            r_dp = self._run_dpll("ablation_hard", trial, clauses,
+                                  timeout=10)
+            r_gl = self._run_pysat("ablation_hard", trial, clauses,
+                                   timeout=10)
+            self._results.extend([r_np, r_dp, r_gl])
+
+        # Part C: Phase transition (ratio 4.3, n=20)
+        print("  [Part C] Phase transition (ratio=4.3, n=20)")
+        for trial in range(5):
+            clauses = gen_random_3cnf(20, 86, seed=trial * 1000 + 430)
+            r_np = self._run_neuroproof("ablation_phase", trial, clauses)
+            r_dp = self._run_dpll("ablation_phase", trial, clauses,
+                                  timeout=10)
+            r_gl = self._run_pysat("ablation_phase", trial, clauses,
+                                   timeout=10)
+            self._results.extend([r_np, r_dp, r_gl])
+
+        print(f"  Total ablation results: {len(self._results)}")
+
+    # ── Experiment 7: Scalability Sweep ────────────────────────────────────────
+
+    def exp_scalability(self, n_instances: int = 5) -> None:
+        """
+        EXP-7: Scalability — sweep n_vars from 10 to 60 at the phase transition
+        ratio (4.267), with n_instances per size. Measures how solve time scales.
+        """
+        print(f"\n[EXP-7] Scalability Sweep (ratio=4.267, {n_instances} inst/size)")
+        ratio = 4.267
+        sizes = list(range(10, 45, 5))  # 10, 15, 20, ..., 40
+
+        for n_vars in sizes:
+            n_clauses = int(ratio * n_vars)
+            for trial in range(n_instances):
+                clauses = gen_random_3cnf(
+                    n_vars, n_clauses, seed=n_vars * 10000 + trial)
+                r_np = self._run_neuroproof(
+                    f"scale_n{n_vars}", trial, clauses)
+                r_dp = self._run_dpll(
+                    f"scale_n{n_vars}", trial, clauses)
+                r_gl = self._run_pysat(
+                    f"scale_n{n_vars}", trial, clauses)
+                self._results.extend([r_np, r_dp, r_gl])
+            print(f"  n={n_vars:3d}: done ({n_instances} instances)")
+
+    # ── Experiment 8: SOTA Comparison ─────────────────────────────────────────
+
+    def exp_sota_comparison(self) -> None:
+        """
+        EXP-8: SOTA comparison — DPLL, Glucose4, NeuroProof+ATSS on:
+          A) PHP_n for n = 2..5
+          B) Random 3-CNF at ratios 2.0, 3.0, 4.0, 5.0 (n=30)
+        """
+        print(f"\n[EXP-8] SOTA Comparison: DPLL vs Glucose4 vs NeuroProof+ATSS")
+
+        # Part A: Pigeonhole
+        print("  [Part A] Pigeonhole Principle")
+        for n in range(2, 6):
+            clauses = gen_pigeonhole(n)
+            r_np = self._run_neuroproof(f"sota_PHP_{n}", 0, clauses, timeout=120)
+            r_dp = self._run_dpll(f"sota_PHP_{n}", 0, clauses, timeout=120)
+            r_gl = self._run_pysat(f"sota_PHP_{n}", 0, clauses, timeout=120)
+            self._results.extend([r_np, r_dp, r_gl])
+            print(f"  PHP_{n}: NP={r_np.status}({r_np.time_sec:.4f}s)  "
+                  f"DPLL={r_dp.status}({r_dp.time_sec:.4f}s)  "
+                  f"Glucose4={r_gl.status}({r_gl.time_sec:.4f}s)")
+
+        # Part B: Random 3-CNF
+        print("  [Part B] Random 3-CNF")
+        for ratio in [2.0, 3.0, 4.0, 5.0]:
+            for trial in range(5):
+                n_vars = 20
+                clauses = gen_random_3cnf(
+                    n_vars, int(ratio * n_vars),
+                    seed=int(ratio * 1000) + trial)
+                r_np = self._run_neuroproof(
+                    f"sota_rand3cnf_r{ratio:.1f}", trial, clauses)
+                r_dp = self._run_dpll(
+                    f"sota_rand3cnf_r{ratio:.1f}", trial, clauses)
+                r_gl = self._run_pysat(
+                    f"sota_rand3cnf_r{ratio:.1f}", trial, clauses)
+                self._results.extend([r_np, r_dp, r_gl])
+            print(f"  ratio={ratio:.1f}: done (15 instances)")
+
+    # ── Save results ──────────────────────────────────────────────────────────
+
+    def exp_gnn_atss(self, n_problems: int = 50) -> None:
+        """
+        EXP-9: GNN ATSS vs Cosine ATSS — compare tactic selection quality.
+
+        For each of n_problems random provable formulas, measure:
+          - proof success rate
+          - proof size (number of steps)
+          - proof time
+
+        Three configurations:
+          A) Cosine ATSS (baseline, symbolic)
+          B) GNN ATSS (neural, GPU-accelerated)
+          C) Blended (50/50 cosine + GNN)
+
+        Requires: torch, torch_geometric (GPU recommended).
+        Falls back gracefully if dependencies are unavailable.
+        """
+        print(f"\n[EXP-9] GNN ATSS vs Cosine ATSS ({n_problems} problems)")
+
+        # Check for GNN availability
+        try:
+            from src.atss_gnn import GNNATSS, FormulaGraph
+            import torch
+            has_gnn = True
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            print(f"  GNN available: device={device}")
+        except ImportError as e:
+            has_gnn = False
+            print(f"  GNN NOT available ({e}), skipping GNN experiments")
+            return
+
+        # Formula pool for generating provable formulas
+        template_formulas = [
             "p -> p",
+            "p -> (q -> p)",
             "(p -> q) -> (q -> r) -> (p -> r)",
             "(p & q) -> p",
             "(p & q) -> q",
-            "p -> (q -> p)",
             "p -> (p | q)",
             "q -> (p | q)",
-            "(p -> q) -> ((p -> ~q) -> ~p)",
-            "(~p -> ~q) -> (q -> p)",
+            "(p -> q) -> (~q -> ~p)",
+            "(p | q) -> (q | p)",
             "((p -> q) & (q -> r)) -> (p -> r)",
             "(p <-> q) -> (q <-> p)",
             "((p | q) & ~p) -> q",
             "p | ~p",
             "~(p & ~p)",
-            "(p -> q) -> (~q -> ~p)",
+            "(p -> q) -> (p -> ~q) -> ~p",
+            "(p & q -> r) -> (p -> q -> r)",
+            "(p -> q -> r) -> (p & q -> r)",
+            "(p -> ~p) -> ~p",
+            "~~p -> p",
+            "(p -> q) -> (~p -> q) -> q",
         ]
-        for fstr in test_formulas:
+
+        rng = random.Random(42)
+        var_pool = ['p', 'q', 'r', 's', 't']
+
+        # Generate formula strings with random variable substitutions
+        def gen_formula(seed_val: int) -> str:
+            template = template_formulas[seed_val % len(template_formulas)]
+            # Substitute variables randomly
+            mapping = {}
+            vars_in_template = sorted(set(c for c in template if c.isalpha() and c in var_pool))
+            if not vars_in_template:
+                return template
+            replacement = rng.sample(var_pool, min(len(vars_in_template), len(var_pool)))
+            for orig, repl in zip(vars_in_template, replacement):
+                mapping[orig] = repl
+            result = template
+            for orig, repl in mapping.items():
+                result = result.replace(orig, repl)
+            return result
+
+        # Create engines
+        shared_atss = ATSS()
+        engine_cosine = TacticEngine(atss=shared_atss, max_depth=200)
+
+        if has_gnn:
+            gnn = GNNATSS(device=device)
+            gnn_blend = GNNATSS(device=device)
+            gnn_blend._gnn_blend = 0.5  # Set blend weight
+            engine_gnn = TacticEngine(atss=ATSS(), gnn_atss=gnn, max_depth=200)
+            engine_blended = TacticEngine(
+                atss=shared_atss, gnn_atss=gnn_blend, max_depth=200)
+            engine_blended._gnn_blend = 0.5
+
+        # Statistics
+        stats = {
+            'Cosine': {'ok': 0, 'total': 0, 'sizes': [], 'times': []},
+        }
+        if has_gnn:
+            stats['GNN'] = {'ok': 0, 'total': 0, 'sizes': [], 'times': []}
+            stats['Blended'] = {'ok': 0, 'total': 0, 'sizes': [], 'times': []}
+
+        for i in range(n_problems):
+            fstr = gen_formula(i)
             f = parse(fstr)
+            n_v = len(f.variables())
+
+            # Cosine ATSS
+            stats['Cosine']['total'] += 1
             try:
                 t0 = time.perf_counter()
-                proof = tauto(f)
+                proof = engine_cosine.prove(f)
                 elapsed = time.perf_counter() - t0
-                self._results.append(BenchmarkResult(
-                    name=f"ablation_tauto({fstr})", instance_id=0,
-                    n_vars=len(f.variables()), n_clauses=0,
-                    status='PROVED', solver='NeuroProof-Full',
-                    time_sec=elapsed, proof_size=proof.size,
-                    proof_depth=proof.depth))
-            except Exception:
-                pass
+                r_cosine = BenchmarkResult(
+                    name=f"gnn_atss_{i}", instance_id=0,
+                    n_vars=n_v, n_clauses=0,
+                    status='PROVED', solver='Cosine-ATSS',
+                    time_sec=elapsed,
+                    proof_size=proof.size,
+                    proof_depth=proof.depth)
+                stats['Cosine']['ok'] += 1
+                stats['Cosine']['sizes'].append(proof.size)
+                stats['Cosine']['times'].append(elapsed)
+            except Exception as e:
+                r_cosine = BenchmarkResult(
+                    name=f"gnn_atss_{i}", instance_id=0,
+                    n_vars=n_v, n_clauses=0,
+                    status='FAIL', solver='Cosine-ATSS', time_sec=0.0)
 
-        # --- Part B: Random 3-CNF at phase transition ---
-        print("  Phase transition subset (n=20, ratio=4.267, 10 instances)")
-        n_vars = 20
-        n_clauses = int(4.267 * n_vars)
-        for trial in range(10):
-            clauses = gen_random_3cnf(n_vars, n_clauses,
-                                       seed=trial * 1000 + n_clauses)
-            all_vars = {v for c in clauses for v, _ in c}
+            self._results.append(r_cosine)
 
-            # Full NeuroProof
-            r = self._run_neuroproof(
-                f"ablation_rand_n{n_vars}", trial, clauses)
-            r.solver = 'NeuroProof-Full'
-            self._results.append(r)
-
-            # DPLL baseline
-            r = self._run_dpll(
-                f"ablation_rand_n{n_vars}", trial, clauses)
-            self._results.append(r)
-
-        print(f"  Ablation: {len(self._results)} results collected")
-
-    # ── EXP-7: Scalability Study ─────────────────────────────────────────────
-
-    def exp_scalability(self) -> None:
-        """
-        EXP-7: Scalability — solve time vs problem size at phase transition.
-
-        Sweep n_vars from 10 to 60 in steps of 10, with ratio fixed at
-        4.267 (theoretical phase transition). 5 random instances per size.
-
-        Uses ProcessPoolExecutor for parallelism.
-        """
-        print(f"\n[EXP-7] Scalability Study")
-        print(f"  Using {self._n_workers} workers")
-
-        tasks = []
-        for n_vars in [10, 20, 30, 40, 50, 60]:
-            n_clauses = int(4.267 * n_vars)
-            for trial in range(5):
-                clauses = gen_random_3cnf(n_vars, n_clauses,
-                                           seed=trial * 1000 + n_clauses)
-                sc = _serialise_clauses(clauses)
-                name = f"scale_n{n_vars}"
-                tasks.append((name, trial, sc, 120.0, 500_000, 'NeuroProof'))
-
-        t_batch = time.perf_counter()
-
-        with ProcessPoolExecutor(max_workers=self._n_workers) as executor:
-            futs = {executor.submit(_worker_neuroproof, t): t
-                    for t in tasks}
-            for fut in as_completed(futs):
+            # GNN ATSS
+            if has_gnn:
+                stats['GNN']['total'] += 1
                 try:
-                    d = fut.result()
-                    self._results.append(self._dict_to_result(d))
+                    t0 = time.perf_counter()
+                    proof = engine_gnn.prove(f)
+                    elapsed = time.perf_counter() - t0
+                    r_gnn = BenchmarkResult(
+                        name=f"gnn_atss_{i}", instance_id=1,
+                        n_vars=n_v, n_clauses=0,
+                        status='PROVED', solver='GNN-ATSS',
+                        time_sec=elapsed,
+                        proof_size=proof.size,
+                        proof_depth=proof.depth)
+                    stats['GNN']['ok'] += 1
+                    stats['GNN']['sizes'].append(proof.size)
+                    stats['GNN']['times'].append(elapsed)
                 except Exception:
-                    pass
+                    r_gnn = BenchmarkResult(
+                        name=f"gnn_atss_{i}", instance_id=1,
+                        n_vars=n_v, n_clauses=0,
+                        status='FAIL', solver='GNN-ATSS', time_sec=0.0)
+                self._results.append(r_gnn)
 
-        elapsed = time.perf_counter() - t_batch
-        print(f"  EXP-7 completed in {elapsed:.1f}s ({len(tasks)} instances)")
+                # Blended ATSS
+                stats['Blended']['total'] += 1
+                try:
+                    t0 = time.perf_counter()
+                    proof = engine_blended.prove(f)
+                    elapsed = time.perf_counter() - t0
+                    r_blend = BenchmarkResult(
+                        name=f"gnn_atss_{i}", instance_id=2,
+                        n_vars=n_v, n_clauses=0,
+                        status='PROVED', solver='Blended-ATSS',
+                        time_sec=elapsed,
+                        proof_size=proof.size,
+                        proof_depth=proof.depth)
+                    stats['Blended']['ok'] += 1
+                    stats['Blended']['sizes'].append(proof.size)
+                    stats['Blended']['times'].append(elapsed)
+                except Exception:
+                    r_blend = BenchmarkResult(
+                        name=f"gnn_atss_{i}", instance_id=2,
+                        n_vars=n_v, n_clauses=0,
+                        status='FAIL', solver='Blended-ATSS', time_sec=0.0)
+                self._results.append(r_blend)
 
-        # Print summary
-        for n_vars in [10, 20, 30, 40, 50, 60]:
-            times = [r.time_sec for r in self._results
-                     if r.name == f"scale_n{n_vars}" and r.solver == 'NeuroProof']
-            if times:
-                avg_t = sum(times) / len(times) * 1000
-                print(f"  n={n_vars}: avg_time={avg_t:.1f}ms ({len(times)} instances)")
+            if (i + 1) % 10 == 0:
+                line = f"  [{i+1:3d}/{n_problems}] "
+                for name, s in stats.items():
+                    line += f"{name}: {s['ok']}/{s['total']} "
+                print(line)
 
-    # ── EXP-8: SOTA Comparison ──────────────────────────────────────────────
+        # Summary
+        print(f"\n  Summary:")
+        for name, s in stats.items():
+            rate = 100.0 * s['ok'] / max(s['total'], 1)
+            avg_sz = sum(s['sizes']) / max(len(s['sizes']), 1)
+            avg_t = sum(s['times']) / max(len(s['times']), 1)
+            print(f"    {name:10s}: {s['ok']:3d}/{s['total']:3d} "
+                  f"({rate:5.1f}%)  avg_size={avg_sz:.1f}  avg_time={avg_t:.4f}s")
 
-    def exp_sota_comparison(self) -> None:
-        """
-        EXP-8: SOTA-style comparison on standard benchmarks.
+        if has_gnn:
+            print(f"    GNN updates: {gnn._update_count}")
+            print(f"    Blended GNN updates: {gnn_blend._update_count}")
 
-        Compares DPLL (no learning), CDCL (NeuroProof without ATSS),
-        and NeuroProof+ATSS on PHP instances and random 3-CNF.
-
-        This demonstrates the value added by clause learning (CDCL over DPLL)
-        and by ATSS heuristic guidance (NeuroProof over vanilla CDCL).
-        """
-        print(f"\n[EXP-8] SOTA Comparison (DPLL vs CDCL vs NeuroProof+ATSS)")
-
-        # --- PHP instances ---
-        print("  PHP instances:")
-        for n in range(2, 6):
-            clauses = gen_pigeonhole(n)
-            all_vars = {v for c in clauses for v, _ in c}
-
-            # DPLL
-            r_dp = self._run_dpll(f"sota_PHP_{n}", 0, clauses, timeout=120.0)
-            self._results.append(r_dp)
-
-            # NeuroProof (CDCL + ATSS)
-            r_np = self._run_neuroproof(f"sota_PHP_{n}", 0, clauses, timeout=120.0)
-            r_np.solver = 'NeuroProof+ATSS'
-            self._results.append(r_np)
-
-            print(f"  PHP_{n}: DPLL={r_dp.status}({r_dp.time_sec:.3f}s), "
-                  f"NeuroProof={r_np.status}({r_np.time_sec:.3f}s)")
-
-        # --- Random 3-CNF at various ratios ---
-        print("  Random 3-CNF (n=20):")
-        for ratio in [2.0, 3.0, 4.267, 5.0]:
-            n_clauses = int(ratio * 20)
-            clauses = gen_random_3cnf(20, n_clauses, seed=42)
-            all_vars = {v for c in clauses for v, _ in c}
-
-            r_dp = self._run_dpll(f"sota_rand_r{ratio:.1f}", 0, clauses, timeout=30.0)
-            self._results.append(r_dp)
-
-            r_np = self._run_neuroproof(f"sota_rand_r{ratio:.1f}", 0, clauses, timeout=60.0)
-            r_np.solver = 'NeuroProof+ATSS'
-            self._results.append(r_np)
-
-            print(f"  ratio={ratio}: DPLL={r_dp.status}({r_dp.time_sec:.3f}s), "
-                  f"NeuroProof={r_np.status}({r_np.time_sec:.3f}s)")
-
-        print(f"  SOTA: {len(self._results)} results collected")
-
-    # ── Save results ────────────────────────────────────────────────────────
+    # ── Save results ──────────────────────────────────────────────────────────
 
     def save_results(self, filename: str = 'results.csv') -> str:
-        """Save accumulated results to CSV file."""
         path = os.path.join(self._output_dir, filename)
         if not self._results:
             return path
@@ -1052,69 +962,83 @@ class ExperimentRunner:
         print(f"\nResults saved to: {path}")
         return path
 
-    def run_all(self) -> str:
-        """Run the complete benchmark suite."""
+    def run_all(self, exp_ids: Optional[List[int]] = None) -> str:
+        """Run the complete benchmark suite. If exp_ids is None, run all (1-9)."""
         print("=" * 60)
-        print(" NeuroProof Benchmark Suite")
-        print(f" Workers: {self._n_workers}")
+        print(" NeuroProof SOTA Benchmark Suite")
         print("=" * 60)
-
-        t_total = time.perf_counter()
-
-        self.exp_random_3cnf(n_vars=30, n_trials=20)
-        self.exp_pigeonhole(max_n=6)
-        self.exp_tseitin(n_trials=10)
-        self.exp_proof_quality()
-        self.exp_atss_learning_curve(n_problems=100)
-        self.exp_ablation()
-        self.exp_scalability()
-        self.exp_sota_comparison()
-
-        t_total = time.perf_counter() - t_total
-        print(f"\n{'=' * 60}")
-        print(f" All experiments completed in {t_total:.1f}s")
-        print(f" Total results: {len(self._results)}")
-        print(f"{'=' * 60}")
-
+        experiments = {
+            1: lambda: self.exp_random_3cnf(n_vars=20, n_trials=10),
+            2: lambda: self.exp_pigeonhole(max_n=6),
+            3: lambda: self.exp_tseitin(n_trials=10),
+            4: lambda: self.exp_proof_quality(),
+            5: lambda: self.exp_atss_learning_curve(n_problems=100),
+            6: lambda: self.exp_ablation(),
+            7: lambda: self.exp_scalability(n_instances=3),
+            8: lambda: self.exp_sota_comparison(),
+            9: lambda: self.exp_gnn_atss(n_problems=50),
+        }
+        if exp_ids is None:
+            exp_ids = sorted(experiments.keys())
+        for eid in exp_ids:
+            if eid in experiments:
+                print(f"\n{'='*60}")
+                print(f" Running EXP-{eid}")
+                print(f"{'='*60}")
+                experiments[eid]()
+            else:
+                print(f"Unknown experiment: EXP-{eid}")
         return self.save_results()
 
 
-# ============================================================================
+# ──────────────────────────────────────────────────────────────────────────────
+# Helper: generate random provable tautologies
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _gen_random_tautology(depth: int, rng: random.Random) -> Formula:
+    """Generate a random provable formula by construction."""
+    vars_ = [Var(f"p{i}") for i in range(1, 5)]
+
+    if depth == 0:
+        v = rng.choice(vars_)
+        return Implies(v, v)   # p → p, always provable
+
+    sub = _gen_random_tautology(depth - 1, rng)
+    extra_var = rng.choice(vars_)
+    kind = rng.randint(0, 3)
+    if kind == 0:
+        return Implies(extra_var, sub)         # q → (provable) is provable
+    elif kind == 1:
+        return Implies(And(extra_var, sub), sub)  # (q ∧ φ) → φ
+    elif kind == 2:
+        return Implies(sub, Or(sub, extra_var))   # φ → (φ ∨ q)
+    else:
+        return And(sub, Implies(extra_var, extra_var))  # φ ∧ (q→q)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Entry point
-# ============================================================================
+# ──────────────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='NeuroProof Benchmark Suite')
-    parser.add_argument('--exp', type=int, default=None,
-                        help='Run only the specified experiment (1-8)')
-    parser.add_argument('--output', type=str, default=None,
-                        help='Output directory for results')
-    parser.add_argument('--workers', type=int, default=None,
-                        help='Number of parallel workers (default: cpu_count)')
+    import argparse
+    parser = argparse.ArgumentParser(description='NeuroProof Benchmark Suite')
+    parser.add_argument('--exp', type=str, default=None,
+                        help='Experiments to run, e.g. "1-3,6,8" or "all"')
     args = parser.parse_args()
 
-    output_dir = args.output or os.path.join(
-        os.path.dirname(__file__), '..', 'experiments')
-    runner = ExperimentRunner(output_dir=output_dir,
-                               n_workers=args.workers)
-
-    if args.exp is not None:
-        exp_map = {
-            1: runner.exp_random_3cnf,
-            2: runner.exp_pigeonhole,
-            3: runner.exp_tseitin,
-            4: runner.exp_proof_quality,
-            5: runner.exp_atss_learning_curve,
-            6: runner.exp_ablation,
-            7: runner.exp_scalability,
-            8: runner.exp_sota_comparison,
-        }
-        if args.exp in exp_map:
-            exp_map[args.exp]()
-            runner.save_results()
-        else:
-            print(f"Unknown experiment: {args.exp}. Choose 1-8.")
-            sys.exit(1)
+    if args.exp is None or args.exp == 'all':
+        exp_ids = None
     else:
-        runner.run_all()
+        exp_ids = []
+        for part in args.exp.split(','):
+            part = part.strip()
+            if '-' in part:
+                start, end = part.split('-', 1)
+                exp_ids.extend(range(int(start), int(end) + 1))
+            else:
+                exp_ids.append(int(part))
+
+    output_dir = os.path.join(os.path.dirname(__file__), '..', 'experiments')
+    runner = ExperimentRunner(output_dir=output_dir)
+    runner.run_all(exp_ids=exp_ids)

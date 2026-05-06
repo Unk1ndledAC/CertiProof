@@ -36,3 +36,9 @@ coq/._CoqProject
 # Output
 experiments/figures/*.pdf
 !experiments/figures/.gitkeep
+experiments/results_gnn.csv
+
+# PyTorch
+*.pt
+*.pth
+*.ckpt

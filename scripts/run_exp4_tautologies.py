@@ -1,10 +1,10 @@
 """
 run_exp4_tautologies.py
-=======================
-EXP-4: Classical tautology proof quality benchmark.
+========================
+EXP-4: Proof Quality (ATSS vs no-ATSS).
 
-Measures proof size, depth, and timing for 15 classical tautologies.
-This is the main experiment demonstrating NeuroProof's proof quality.
+Prove 15 classical propositional tautologies with and without
+ATSS guidance. Measures proof size, depth, and time.
 
 Usage:
     python scripts/run_exp4_tautologies.py
@@ -19,4 +19,4 @@ from experiments.benchmark_suite import ExperimentRunner
 if __name__ == '__main__':
     runner = ExperimentRunner(output_dir=os.path.join(os.path.dirname(__file__), '..', 'experiments'))
     runner.exp_proof_quality()
-    runner.save_results()
+    runner.save_results('results.csv')

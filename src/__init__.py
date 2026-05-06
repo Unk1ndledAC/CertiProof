@@ -1,6 +1,6 @@
 """
-src/__init__.py
-===============
+__init__.py
+===========
 NeuroProof: A Hybrid Propositional Proof System with Adaptive Tactic
 Synthesis and Certified Proof Checking.
 
@@ -11,6 +11,7 @@ Public API:
   - Proof: immutable certified proof object
   - NeuroProofSolver: CDCL solver with ATSS and interpolation
   - TacticEngine: high-level tactic-based prover
+  - GNNATSS: GPU-accelerated GNN-based tactic selection (optional)
 """
 
 from .formula import (
@@ -23,7 +24,14 @@ from .kernel import verify_step, verify_step_strict, KernelError
 from .solver import NeuroProofSolver, ATSS, SolverStatus, SolverResult
 from .tactic import TacticEngine, TacticResult, decide, tauto, refute
 
-__version__ = "1.0.0"
+# GNN ATSS (optional, requires torch_geometric)
+try:
+    from .atss_gnn import GNNATSS, FormulaGraph
+    _HAS_GNN = True
+except ImportError:
+    _HAS_GNN = False
+
+__version__ = "1.1.0"
 __all__ = [
     # Formulas
     "Formula", "Var", "Not", "And", "Or", "Implies", "Iff", "Xor",
@@ -38,3 +46,5 @@ __all__ = [
     # Tactics
     "TacticEngine", "TacticResult", "decide", "tauto", "refute",
 ]
+if _HAS_GNN:
+    __all__ += ["GNNATSS", "FormulaGraph"]

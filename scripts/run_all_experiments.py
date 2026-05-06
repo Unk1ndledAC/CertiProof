@@ -1,7 +1,7 @@
 """
 run_all_experiments.py
 =====================
-Run all 5 benchmark experiments in sequence.
+Run all 9 benchmark experiments in sequence.
 
 Usage:
     python scripts/run_all_experiments.py

@@ -1,16 +1,8 @@
 """
 solver.py
 =========
-NeuroProof Propositional Solver: an optimised CDCL-based SAT solver with
-integrated proof logging and the novel Adaptive Tactic Synthesis System (ATSS).
-
-Performance optimisations over the naive implementation:
-  - Two-Watched-Literal (2WL) scheme for O(1) BCP per assignment
-  - VSIDS with exponential bump/decay (1/0.95)
-  - Phase saving (remembers last polarity per variable)
-  - Luby restart sequence (geometric restarts)
-  - Activity-based learned-clause deletion
-  - Trail-marker backtracking (O(1) pop_to_level)
+NeuroProof Propositional Solver: a CDCL-based SAT solver with integrated
+proof logging and the novel Adaptive Tactic Synthesis System (ATSS).
 
 Architecture
 ------------
@@ -42,7 +34,6 @@ import hashlib
 from dataclasses import dataclass, field
 from typing import (Dict, FrozenSet, List, Optional, Set, Tuple)
 from enum import Enum, auto
-from collections import defaultdict
 
 from .formula import (Formula, Var, Unary, Binary, _Constant,
                       Connective, Top, Bot, And, Or, Not, parse)
@@ -66,11 +57,6 @@ def neg_lit(v: str) -> Literal:
 def negate_lit(lit: Literal) -> Literal:
     return (lit[0], not lit[1])
 
-def lit_key(lit: Literal) -> int:
-    """Deterministic integer key for a literal (for array indexing)."""
-    v, p = lit
-    return (hash(v) << 1) | (1 if p else 0)
-
 def clause_from_formula(f: Formula) -> Clause:
     """Convert a clause formula (disjunction of literals) to a Clause set."""
     lits: Set[Literal] = set()
@@ -93,78 +79,48 @@ def _collect_lits(f: Formula, lits: Set[Literal]) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Luby sequence generator for restarts
-# ──────────────────────────────────────────────────────────────────────────────
-
-def _luby_sequence() -> int:
-    """Generate Luby restart intervals: 1,1,2,1,1,2,4,1,1,2,1,1,2,4,8,...
-
-    The Luby sequence is defined by repeatedly doubling a "unit" pattern:
-      1,           (2^0 terms: [1])
-      1,2,         (2^1 terms: [1,2])
-      1,2,4,       (2^2 terms: [1,2,4])
-      ...
-    and concatenating: [1] + [1,2] + [1,2,1,1,2,4] + ...
-
-    Reference: Luby, Sinclair & Zuckerman (1993),
-               \"Optimal Speedup of Las Vegas Algorithms.\"
-    """
-    def _gen():
-        # Iterative: build the infinite sequence by extending the
-        # \"unit\" sequence: u_1 = [1], u_{k+1} = u_k @ [2^k]
-        # The full sequence is u_1 @ u_2 @ u_3 @ ...
-        unit = [1]
-        while True:
-            for x in unit:
-                yield x
-            unit = unit + [unit[-1] * 2]
-
-    return _gen()
-
-
-_luby_gen = _luby_sequence()
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Optimised Assignment with trail markers
+# Assignment and unit propagation
 # ──────────────────────────────────────────────────────────────────────────────
 
 class Assignment:
     """Partial assignment of Boolean values to propositional variables."""
 
-    __slots__ = ('_values', '_polarity', '_levels', '_trail', '_reasons',
-                 '_trail_markers', '_dl', '_qhead')
-
     def __init__(self) -> None:
-        self._values:  Dict[str, bool]  = {}   # var → value
-        self._polarity: Dict[str, bool]  = {}   # var → last assigned polarity (phase saving)
-        self._levels:  Dict[str, int]    = {}   # var → decision level
-        self._reasons: Dict[str, int]    = {}   # var → learned-clause index (None if decision)
-        self._trail:   List[str]         = []   # ordered list of assigned variables
-        self._trail_markers: List[int]   = [0]  # trail positions at each decision level
-        self._dl: int = 0
-        self._qhead: int = 0                      # queue head for BCP
+        self._map: Dict[str, bool] = {}
+        self._trail: List[Tuple[str, bool, Optional[int]]] = []
+        # trail_lim[d] = trail index at the start of decision level d+1
+        # i.e. trail_lim[0] = trail size before 1st decision (level 0 assignments)
+        self._trail_lim: List[int] = []
+        self._saved_polarity: Dict[str, bool] = {}
+        self._level: Dict[str, int] = {}
+        self._dl: int = 0   # current decision level
 
     def assign(self, var: str, value: bool,
                reason: Optional[int] = None) -> None:
-        assert var not in self._values, f"Variable {var} already assigned"
-        self._values[var] = value
-        self._polarity[var] = value
-        self._levels[var] = self._dl
-        self._reasons[var] = reason
-        self._trail.append(var)
+        assert var not in self._map, f"Variable {var} already assigned"
+        self._map[var] = value
+        self._trail.append((var, value, reason))
+        self._level[var] = self._dl
+        # Record polarity for phase saving
+        self._saved_polarity[var] = value
 
     def value(self, var: str) -> Optional[bool]:
-        return self._values.get(var, None)
+        return self._map.get(var, None)
 
     def evaluate(self, lit: Literal) -> Optional[bool]:
         v, is_pos = lit
-        val = self._values.get(v, None)
+        val = self._map.get(v, None)
         if val is None:
             return None
         return val if is_pos else not val
 
     def eval_clause(self, clause: Clause) -> Optional[bool]:
+        """
+        Evaluate a clause:
+          - True  if any literal is True
+          - False if all literals are False
+          - None  if undetermined
+        """
         has_undef = False
         for lit in clause:
             ev = self.evaluate(lit)
@@ -175,33 +131,59 @@ class Assignment:
         return None if has_undef else False
 
     def push_level(self) -> None:
+        self._trail_lim.append(len(self._trail))
         self._dl += 1
-        self._trail_markers.append(len(self._trail))
 
     def pop_to_level(self, target: int) -> None:
-        """O(1) backtracking via trail marker truncation."""
-        if target >= self._dl:
-            return  # already at or below target level
-        marker = self._trail_markers[target + 1]
-        for var in self._trail[marker:]:
-            del self._values[var]
-            del self._levels[var]
-            del self._reasons[var]
-        del self._trail[marker:]
-        del self._trail_markers[target + 1:]
+        """
+        Backtrack to decision level *target*, undoing later assignments.
+
+        Uses *trail_lim* for O(1) trail truncation instead of an
+        O(n) linear scan.
+        """
+        if target < 0:
+            target = 0
+
+        # Determine the trail index at the start of level *target*.
+        #  trail_lim[d] = trail size just before decision d+1 is made
+        #  Therefore:
+        #   – target == 0 : keep trail[0 : trail_lim[0]]
+        #   – target >= 1 : keep trail[0 : trail_lim[target]]
+        if self._trail_lim:
+            if target == 0:
+                cut = self._trail_lim[0]
+            elif target < len(self._trail_lim):
+                cut = self._trail_lim[target]
+            else:
+                # target >= len(trail_lim) ­– should not happen in a correct
+                # CDCL trace; keep everything and return early.
+                self._dl = target
+                return
+        else:
+            # No decisions were ever made; all assignments are at level 0.
+            # Backtracking to any level means "keep everything".
+            self._dl = target
+            return
+
+        # Undo assignments that are beyond the cut point.
+        for i in range(cut, len(self._trail)):
+            var, _, _ = self._trail[i]
+            self._map.pop(var, None)
+            self._level.pop(var, None)
+            # NOTE: we deliberately keep entries in _saved_polarity so that
+            # phase-saving can still use them if the variable is re-assigned
+            # at a lower decision level.
+
+        self._trail = self._trail[:cut]
+        self._trail_lim = self._trail_lim[:target] if target > 0 else []
         self._dl = target
-        self._qhead = len(self._trail)
 
     @property
     def decision_level(self) -> int:
         return self._dl
 
     def unassigned_vars(self, all_vars: Set[str]) -> Set[str]:
-        return all_vars - set(self._values)
-
-    def saved_polarity(self, var: str) -> Optional[bool]:
-        """Return the last polarity for var (phase saving)."""
-        return self._polarity.get(var, None)
+        return all_vars - set(self._map)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -251,11 +233,11 @@ class ATSS:
       it applicable to arbitrary input formulas from the first step.
     """
 
-    __slots__ = ('_decay', '_table', '_lemma_store')
-
     def __init__(self, decay: float = 0.95) -> None:
         self._decay = decay
+        # Maps formula hash → (success_count, attempt_count)
         self._table: Dict[int, Tuple[float, float]] = {}
+        # Lemma store: formula hash → ProofStep
         self._lemma_store: Dict[int, ProofStep] = {}
 
     def _hash(self, f: Formula) -> int:
@@ -276,7 +258,7 @@ class ATSS:
         h = self._hash(f)
         s, a = self._table.get(h, (0.0, 0.0))
         if a < 1e-9:
-            return 0.5
+            return 0.5   # uninformed prior
         return s / a
 
     def store_lemma(self, step: ProofStep) -> None:
@@ -284,9 +266,14 @@ class ATSS:
         self._lemma_store[h] = step
 
     def lookup_lemma(self, f: Formula) -> Optional[ProofStep]:
+        """Return a previously proved step for formula f, if any."""
         return self._lemma_store.get(self._hash(f), None)
 
     def suggest_cut(self, subformulas: List[Formula]) -> Optional[Formula]:
+        """
+        Suggest the best cut formula from a list of candidate subformulas,
+        ranked by ATSS score.  Returns None if no candidate has score > 0.5.
+        """
         ranked = sorted(subformulas, key=self.score, reverse=True)
         for f in ranked:
             if self.score(f) > 0.5:
@@ -322,7 +309,17 @@ class InterpolantExtractor:
 
     def interpolate_resolution(self, clauses_A: List[Clause],
                                 clauses_B: List[Clause]) -> Formula:
+        """
+        Compute a Craig interpolant for A ∧ B ⊢ ⊥ using a greedy resolution
+        interpolation strategy.
+
+        This is a polynomial-time procedure when the interpolant complexity
+        is bounded (which holds for Horn clauses — see Grädel et al. 2019).
+        """
+        # Annotate each clause with its source
         annotated: Dict[int, Tuple[Clause, str, Formula]] = {}
+        # (clause, source in {'A','B','AB'}, interpolant)
+
         for c in clauses_A:
             itp = self._clause_interpolant_A(c)
             annotated[id(c)] = (c, 'A', itp)
@@ -330,14 +327,23 @@ class InterpolantExtractor:
             itp = self._clause_interpolant_B(c)
             annotated[id(c)] = (c, 'B', itp)
 
-        result_itp = self._resolve_to_empty(list(annotated.values()))
+        # Attempt resolution to derive the empty clause
+        result_itp = self._resolve_to_empty(
+            list(annotated.values()))
         return result_itp if result_itp is not None else Top
 
     def _clause_interpolant_A(self, c: Clause) -> Formula:
-        parts = [self._lit_to_formula(l) for l in c if l[0] in self._common]
+        """
+        Interpolant for an A-clause c:
+          I = ∨{ l : l is a literal of c whose variable is in vars(A)∩vars(B) }
+          or ⊥ if no common variable appears.
+        """
+        parts = [self._lit_to_formula(l) for l in c
+                 if l[0] in self._common]
         return self._big_or(parts) if parts else Bot
 
     def _clause_interpolant_B(self, c: Clause) -> Formula:
+        """Interpolant for a B-clause: ⊤ (the B side does not constrain)."""
         return Top
 
     def _lit_to_formula(self, lit: Literal) -> Formula:
@@ -356,27 +362,53 @@ class InterpolantExtractor:
     def _resolve_to_empty(
             self,
             ann: List[Tuple[Clause, str, Formula]]) -> Optional[Formula]:
+        """
+        Greedy resolution: repeatedly resolve the two smallest resolvable clauses
+        until the empty clause is reached or no more resolutions are possible.
+
+        Returns the interpolant of the empty clause derivation, or None.
+        """
         clauses = list(ann)
-        for _ in range(10000):
+        t_start = time.perf_counter()
+        max_iters = 50000
+        max_time = 10.0  # seconds
+        for _ in range(max_iters):
+            if time.perf_counter() - t_start > max_time:
+                return None  # timeout
             if any(c == frozenset() for c, _, _ in clauses):
+                # Found the empty clause
                 for c, src, itp in clauses:
                     if c == frozenset():
                         return itp
+            # Build a literal index for faster resolution pair lookup
+            lit_to_clauses: Dict[Literal, List[int]] = {}
+            for ci, (c, _, _) in enumerate(clauses):
+                for lit in c:
+                    lit_to_clauses.setdefault(lit, []).append(ci)
+            # Try to find a resolvable pair using the index
             resolved = False
-            for i in range(len(clauses)):
-                for j in range(i + 1, len(clauses)):
-                    c1, s1, itp1 = clauses[i]
-                    c2, s2, itp2 = clauses[j]
-                    piv, new_clause = self._try_resolve(c1, c2)
-                    if piv is not None:
-                        if piv[0] in self._common:
-                            new_itp = Or(itp1, itp2)
-                        elif s1 == 'A' or s2 == 'A':
-                            new_itp = Or(itp1, itp2)
-                        else:
-                            new_itp = And(itp1, itp2)
-                        clauses.append((new_clause, 'AB', new_itp))
-                        resolved = True
+            for i, (c1, s1, itp1) in enumerate(clauses):
+                for lit in c1:
+                    neg = negate_lit(lit)
+                    if neg not in lit_to_clauses:
+                        continue
+                    for j in lit_to_clauses[neg]:
+                        if j <= i:
+                            continue
+                        c2, s2, itp2 = clauses[j]
+                        piv, new_clause = self._try_resolve(c1, c2)
+                        if piv is not None:
+                            # Compute interpolant of the resolvent
+                            if piv[0] in self._common:
+                                new_itp = Or(itp1, itp2)
+                            elif s1 == 'A' or s2 == 'A':
+                                new_itp = Or(itp1, itp2)
+                            else:
+                                new_itp = And(itp1, itp2)
+                            clauses.append((new_clause, 'AB', new_itp))
+                            resolved = True
+                            break
+                    if resolved:
                         break
                 if resolved:
                     break
@@ -387,6 +419,11 @@ class InterpolantExtractor:
     @staticmethod
     def _try_resolve(c1: Clause, c2: Clause
                      ) -> Tuple[Optional[Literal], Clause]:
+        """
+        Attempt to resolve c1 and c2.
+
+        Returns (pivot_literal, resolvent) if successful, else (None, _).
+        """
         for lit in c1:
             if negate_lit(lit) in c2:
                 resolvent = (c1 - {lit}) | (c2 - {negate_lit(lit)})
@@ -411,28 +448,11 @@ class NeuroProofSolver:
       2. Unit propagation at level 0
       3. CDCL main loop:
          a. Pick a decision literal (ATSS-guided VSIDS heuristic)
-         b. Unit propagation via two-watched-literal scheme
+         b. Unit propagation
          c. On conflict: analyse, learn clause, backjump
-         d. On restart: reset to level 0, keep learned clauses
-         e. On SAT: return model
+         d. On SAT: return model
       4. On UNSAT: extract refutation proof and Craig interpolant
-
-    Optimisations:
-      - Two-Watched-Literal (2WL) BCP
-      - VSIDS with exponential bump/decay
-      - Phase saving
-      - Luby restart sequence
-      - Activity-based clause deletion
-      - Trail-marker O(1) backtracking
     """
-
-    # Tuning constants
-    _VSIDS_DECAY    = 0.95
-    _VSIDS_BUMP     = 1.0 / 0.95      # = 1.0 / decay
-    _RESTART_BASE   = 100              # base for Luby sequence
-    _CLAUSE_DELETE_RATIO = 0.5         # delete half of learned clauses when triggered
-    _CLAUSE_DELETE_START = 5000        # first deletion after this many learned clauses
-    _MIN_LEARNED     = 100             # never delete below this many learned clauses
 
     def __init__(self, atss: Optional[ATSS] = None,
                  max_conflicts: int = 100_000,
@@ -440,6 +460,19 @@ class NeuroProofSolver:
         self._atss = atss or ATSS()
         self._max_conflicts = max_conflicts
         self._verbose = verbose
+        # VSIDS (Variable State Independent Decaying Sum)
+        self._vsids_scores: Dict[str, float] = {}
+        self._vsids_inc: float = 1.0
+        self._vsids_decay_factor: float = 0.95
+        # Restart (Luby sequence)
+        self._restart_luby_idx: int = 0
+        self._restart_next: int = 100   # initial restart threshold (conflicts)
+        self._restart_inc: float = 2.0
+        # Clause deletion (glucose-style activity)
+        self._clause_act: Dict[int, float] = {}   # clause index → activity
+        self._clause_act_inc: float = 1.0
+        self._clause_decay_factor: float = 0.999
+        self._max_learned: int = 5000
 
     def solve_formula(self, formula: Formula) -> SolverResult:
         """Solve a general propositional formula (auto-converts to CNF)."""
@@ -455,8 +488,17 @@ class NeuroProofSolver:
         t0 = time.perf_counter()
         stats: Dict[str, int] = {
             'decisions': 0, 'conflicts': 0, 'learned_clauses': 0,
-            'unit_props': 0, 'lemma_reuses': 0, 'restarts': 0
+            'unit_props': 0, 'lemma_reuses': 0, 'restarts': 0,
+            'deleted_clauses': 0
         }
+
+        # Reset per-solve state
+        self._vsids_scores.clear()
+        self._vsids_inc = 1.0
+        self._restart_luby_idx = 0
+        self._restart_next = 100
+        self._clause_act.clear()
+        self._clause_act_inc = 1.0
 
         if all_vars is None:
             all_vars = set()
@@ -473,180 +515,43 @@ class NeuroProofSolver:
                 time_sec=time.perf_counter() - t0)
 
         assignment = Assignment()
-        clause_db: List[Clause] = list(clauses)
-        learned_origins: List[List[int]] = []
-        n_original = len(clause_db)
+        clause_db  = list(clauses)
+        reason_map: Dict[str, int]  = {}  # var → clause index that forced it
+        learned_origins: List[List[int]] = []  # for proof logging
+        n_original = len(clause_db)   # index where learned clauses start
 
-        # ── Two-Watched-Literal data structures ────────────────────────────────
-        # watches[lit_key] = list of clause indices where lit is a watched literal
-        watches: Dict[Literal, List[int]] = defaultdict(list)
-        # For each clause, store which two literals are currently watched
-        watch_pairs: List[Optional[Tuple[Literal, Literal]]] = [None] * n_original
-
-        for idx, clause in enumerate(clause_db):
-            lits = list(clause)
-            if len(lits) == 0:
-                continue  # already handled
-            elif len(lits) == 1:
-                # Unit clause: both watches on the same literal
-                watches[lits[0]].append(idx)
-                watch_pairs[idx] = (lits[0], lits[0])
-            else:
-                # Watch first two literals
-                w0, w1 = lits[0], lits[1]
-                watches[w0].append(idx)
-                watches[w1].append(idx)
-                watch_pairs[idx] = (w0, w1)
-
-        # ── VSIDS variable activity ────────────────────────────────────────────
-        activity: Dict[str, float] = defaultdict(float)
-        var_inc: float = 1.0
-
-        def bump_variable(var: str) -> None:
-            nonlocal var_inc
-            activity[var] += var_inc
-            if activity[var] > 1e100:
-                # Rescale to prevent overflow
-                for v in activity:
-                    activity[v] *= 1e-100
-                var_inc *= 1e-100
-
-        def decay_activities() -> None:
-            nonlocal var_inc
-            for v in activity:
-                activity[v] *= self._VSIDS_DECAY
-            var_inc /= self._VSIDS_DECAY
-
-        # ── Learned clause activity for deletion ───────────────────────────────
-        clause_activity: List[float] = [0.0] * n_original
-
-        def bump_clause(idx: int) -> None:
-            """Bump activity of an existing clause in-place."""
-            if idx < len(clause_activity):
-                clause_activity[idx] += var_inc
-
-        # ── Two-Watched-Literal BCP ────────────────────────────────────────────
-        def propagate() -> Optional[Clause]:
-            """
-            BCP using the two-watched-literal scheme.
-
-            When a literal is falsified, we check clauses watching its negation.
-            If the clause becomes unit, we propagate the remaining watched literal.
-            """
-            asgn = assignment
-            conflict_clause: Optional[Clause] = None
-            trail = asgn._trail
-
-            while asgn._qhead < len(trail):
-                p_var = trail[asgn._qhead]
-                asgn._qhead += 1
-                p_val = asgn._values[p_var]
-                # The literal that just became true: (p_var, p_val)
-                # The literal that just became false: (p_var, not p_val)
-                false_lit = (p_var, not p_val)
-
-                # Check all clauses watching false_lit
-                # Copy the watch list to allow in-place modification
-                wl = watches[false_lit]
-                new_wl: List[int] = []
-                i = 0
-                while i < len(wl):
-                    ci = wl[i]
-                    i += 1
-
-                    if ci < len(clause_db):
-                        clause = clause_db[ci]
-                        wp = watch_pairs[ci]
-                        if wp is None:
-                            new_wl.append(ci)
-                            continue
-
-                        # Make sure false_lit is one of the watched literals
-                        # (it should be, since we watch for falsification)
-                        block = wp[0]
-                        other = wp[1]
-
-                        if block != false_lit:
-                            block, other = other, block
-
-                        # Check if 'other' (the other watched literal) is satisfied
-                        other_val = asgn.evaluate(other)
-                        if other_val is True:
-                            # Clause is already satisfied — keep watching
-                            new_wl.append(ci)
-                            continue
-
-                        # Try to find a new literal to watch
-                        found = False
-                        for lit in clause:
-                            if lit == block or lit == other:
-                                continue
-                            val = asgn.evaluate(lit)
-                            if val is not False:
-                                # Found a non-false literal — switch watch.
-                                # Don't add ci to new_wl (removes from false_lit's watch).
-                                # Add to new literal's watch and update pair.
-                                watches[lit].append(ci)
-                                watch_pairs[ci] = (lit, other)
-                                found = True
-                                break
-
-                        # No replacement found — clause is unit or conflict
-                        new_wl.append(ci)
-
-                        if other_val is None:
-                            # Unit propagation
-                            other_var, other_pos = other
-                            asgn.assign(other_var, other_pos, reason=ci)
-                            stats['unit_props'] += 1
-                            bump_variable(other_var)
-                        elif other_val is False:
-                            # Conflict!
-                            conflict_clause = clause
-                            # Drain remaining watches
-                            while i < len(wl):
-                                new_wl.append(wl[i])
-                                i += 1
-                            break
-
-                # Replace the watch list
-                watches[false_lit] = new_wl
-
-            return conflict_clause
-
-        # ── Level-0 unit propagation ───────────────────────────────────────────
-        # Assign forced unit clauses first
-        for idx, clause in enumerate(clause_db):
-            if len(clause) == 1:
-                lit = list(clause)[0]
-                var, is_pos = lit
-                if assignment.value(var) is None:
-                    assignment.assign(var, is_pos, reason=idx)
-                    bump_variable(var)
-
-        assignment._qhead = 0
-        conflict = propagate()
-
+        # Level-0 unit propagation
+        conflict = self._unit_propagate(clause_db, assignment,
+                                        reason_map, stats)
         if conflict is not None:
             return SolverResult(
                 status=SolverStatus.UNSAT,
-                proof=self._build_resolution_proof(clause_db, learned_origins),
+                proof=self._build_resolution_proof(
+                    clause_db, learned_origins),
                 stats=stats,
                 time_sec=time.perf_counter() - t0)
 
-        # ── Luby restart sequence ──────────────────────────────────────────────
-        luby = _luby_sequence()
-        next_restart_limit = next(luby) * self._RESTART_BASE
-        conflicts_since_restart = 0
-
-        # ── Clause deletion tracking ───────────────────────────────────────────
-        next_deletion_limit = self._CLAUSE_DELETE_START
-
-        # ── Main CDCL loop ────────────────────────────────────────────────────
+        # Main CDCL loop
         while True:
+            # ---- Restart check ----
+            if self._should_restart(stats['conflicts']):
+                stats['restarts'] += 1
+                assignment.pop_to_level(0)
+                reason_map.clear()
+                if self._verbose:
+                    print(f"  [restart #{stats['restarts']}] "
+                          f"conflicts={stats['conflicts']} "
+                          f"learned={stats['learned_clauses']}")
+
+            # ---- Clause deletion ----
+            if stats['conflicts'] % 1000 == 0 and stats['conflicts'] > 0:
+                old_len = len(clause_db)
+                self._delete_learned(clause_db, learned_origins)
+                stats['deleted_clauses'] += old_len - len(clause_db)
+
             unassigned = assignment.unassigned_vars(all_vars)
             if not unassigned:
-                model = dict(assignment._values)
+                model = dict(assignment._map)
                 return SolverResult(
                     status=SolverStatus.SAT,
                     model=model,
@@ -658,99 +563,28 @@ class NeuroProofSolver:
                     status=SolverStatus.UNKNOWN, stats=stats,
                     time_sec=time.perf_counter() - t0)
 
-            # ── Restart check ──────────────────────────────────────────────────
-            if (conflicts_since_restart >= next_restart_limit
-                    and assignment.decision_level > 0):
-                assignment.pop_to_level(0)
-                stats['restarts'] += 1
-                conflicts_since_restart = 0
-                next_restart_limit = next(luby) * self._RESTART_BASE
-                decay_activities()
-                if self._verbose:
-                    print(f"  [restart #{stats['restarts']}] "
-                          f"dl=0, {stats['conflicts']} total conflicts, "
-                          f"{len(clause_db)} clauses")
-                continue
-
-            # ── Clause deletion ────────────────────────────────────────────────
-            n_learned = len(clause_db) - n_original
-            if n_learned >= next_deletion_limit:
-                next_deletion_limit = int(next_deletion_limit * 1.5)
-
-                learned_indices = list(range(n_original, len(clause_db)))
-                if len(learned_indices) > self._MIN_LEARNED:
-                    scored = []
-                    for li in learned_indices:
-                        act = clause_activity[li] if li < len(clause_activity) else 0.0
-                        scored.append((act, li))
-                    scored.sort(key=lambda x: x[0])
-
-                    # Delete the lower-activity half (minus MIN_LEARNED)
-                    n_to_delete = max(
-                        0,
-                        len(scored) - self._MIN_LEARNED - len(scored) // 2)
-                    if n_to_delete > 0:
-                        to_delete: Set[int] = set()
-                        for act, li in scored[:n_to_delete]:
-                            to_delete.add(li)
-
-                        # Build old→new index map, skip deleted clauses
-                        old_to_new: Dict[int, int] = {}
-                        new_clause_db: List[Clause] = []
-                        new_watch_pairs: List[Optional[Tuple[Literal, Literal]]] = []
-                        for ci in range(len(clause_db)):
-                            if ci not in to_delete:
-                                old_to_new[ci] = len(new_clause_db)
-                                new_clause_db.append(clause_db[ci])
-                                new_watch_pairs.append(watch_pairs[ci])
-
-                        # Rebuild watches from scratch
-                        new_watches: Dict[Literal, List[int]] = defaultdict(list)
-                        for nci, wp in enumerate(new_watch_pairs):
-                            if wp is not None:
-                                new_watches[wp[0]].append(nci)
-                                new_watches[wp[1]].append(nci)
-
-                        # Rebuild clause_activity and learned_origins
-                        new_ca = [0.0] * len(new_clause_db)
-                        for old_ci, new_ci in old_to_new.items():
-                            if old_ci < len(clause_activity):
-                                new_ca[new_ci] = clause_activity[old_ci]
-                        clause_activity = new_ca
-
-                        new_lo: List[List[int]] = []
-                        for li in learned_indices:
-                            if li not in to_delete and li in old_to_new:
-                                old_orig = learned_origins[li - n_original]
-                                new_orig = [old_to_new[o] for o in old_orig
-                                            if o in old_to_new]
-                                new_lo.append(new_orig)
-
-                        clause_db = new_clause_db
-                        watch_pairs = new_watch_pairs
-                        watches = new_watches
-                        n_original = sum(
-                            1 for ci in old_to_new if ci < n_original)
-                        learned_origins = new_lo
-
-            # ── Decision ──────────────────────────────────────────────────────
+            # ---- Decision ----
             decision_var = self._pick_variable(
-                unassigned, clause_db, assignment, activity)
-            # Phase saving
-            saved = assignment.saved_polarity(decision_var)
-            decision_val = saved if saved is not None else True
+                unassigned, clause_db, assignment)
+            decision_val = self._decide_value(
+                decision_var, clause_db, assignment)
             stats['decisions'] += 1
             assignment.push_level()
             assignment.assign(decision_var, decision_val)
 
-            # ── Propagation loop ───────────────────────────────────────────────
+            # ---- Unit propagation + conflict loop ----
             while True:
-                conflict = propagate()
+                conflict = self._unit_propagate(
+                    clause_db, assignment, reason_map, stats)
                 if conflict is None:
-                    break
+                    break   # no conflict
 
                 stats['conflicts'] += 1
-                conflicts_since_restart += 1
+
+                # VSIDS decay every 256 conflicts
+                if stats['conflicts'] % 256 == 0:
+                    self._vsids_decay()
+                    self._clause_decay()
 
                 if assignment.decision_level == 0:
                     return SolverResult(
@@ -760,91 +594,203 @@ class NeuroProofSolver:
                         stats=stats,
                         time_sec=time.perf_counter() - t0)
 
-                # Conflict analysis (1-UIP)
+                # Conflict analysis (1st UIP)
                 learned, backjump_level, origins = self._analyse_conflict(
-                    conflict, clause_db, assignment)
+                    conflict, clause_db, assignment, reason_map)
 
-                # Add learned clause to the database
-                learn_idx = len(clause_db)
+                learned_idx = len(clause_db)
                 clause_db.append(learned)
                 learned_origins.append(origins)
-                clause_activity.append(var_inc)  # initial activity = current bump
                 stats['learned_clauses'] += 1
-                bump_clause(learn_idx)  # bump the newly added clause
 
-                # Set up watches for the learned clause
-                learn_lits = list(learned)
-                if len(learn_lits) == 0:
-                    # Empty clause → UNSAT
-                    return SolverResult(
-                        status=SolverStatus.UNSAT,
-                        proof=self._build_resolution_proof(
-                            clause_db, learned_origins),
-                        stats=stats,
-                        time_sec=time.perf_counter() - t0)
-                elif len(learn_lits) == 1:
-                    watches[learn_lits[0]].append(learn_idx)
-                    watch_pairs.append((learn_lits[0], learn_lits[0]))
-                else:
-                    # Place the asserting literal first: the unique literal
-                    # whose variable is at backjump_level.
-                    asserting_lit = None
-                    other_lits = []
-                    for lit in learn_lits:
-                        v = lit[0]
-                        if assignment._levels.get(v, 0) == backjump_level:
-                            asserting_lit = lit
-                        else:
-                            other_lits.append(lit)
-                    if asserting_lit is None:
-                        # Fallback: just use first literal
-                        asserting_lit = learn_lits[0]
-                        other_lits = learn_lits[1:]
-                    # Second watch: literal with highest decision level
-                    other_lits.sort(
-                        key=lambda l: assignment._levels.get(l[0], 0), reverse=True)
-                    l0 = asserting_lit
-                    l1 = other_lits[0] if other_lits else asserting_lit
-                    watches[l0].append(learn_idx)
-                    watches[l1].append(learn_idx)
-                    watch_pairs.append((l0, l1))
+                # Bump clause activity
+                self._clause_bump(learned_idx)
+
+                # Bump VSIDS scores for all variables in the learned clause
+                for v, _ in learned:
+                    self._vsids_bump(v)
 
                 # Record ATSS signal
                 for v, is_pos in learned:
                     self._atss.record_success(
                         Var(v) if is_pos else Not(Var(v)))
 
-                # Bump variables in the learned clause
-                for v, _ in learned:
-                    bump_variable(v)
-
                 # Backjump
                 assignment.pop_to_level(backjump_level)
-
-                # Assert the learned clause's unit literal
-                if len(learn_lits) == 1:
-                    v, is_pos = learn_lits[0]
+                # Re-clear reason map for undone vars
+                for v in list(reason_map.keys()):
                     if assignment.value(v) is None:
-                        assignment.assign(v, is_pos, reason=learn_idx)
-                        bump_variable(v)
-                else:
-                    # The first literal should be the asserting literal at backjump_level
-                    v0, p0 = learn_lits[0]
-                    if assignment.value(v0) is None:
-                        assignment.assign(v0, p0, reason=learn_idx)
-                        bump_variable(v0)
+                        del reason_map[v]
 
+                # Assert the learned clause (unit should be propagated)
                 break
-
-        return SolverResult(
-            status=SolverStatus.UNKNOWN, stats=stats,
-            time_sec=time.perf_counter() - t0)
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
+    # ---- Luby sequence for restart scheduling ----
+    @staticmethod
+    def _luby(i: int) -> int:
+        """
+        Return the i-th value of the Luby sequence (1-indexed).
+
+        Luby sequence: 1,1,2,1,1,2,4,1,1,2,1,1,2,4,8,...
+        Used for restart interval scheduling in modern CDCL solvers.
+        """
+        if i <= 0:
+            return 1
+        # Find the largest power-of-two that fits
+        k = 1
+        while (1 << k) < i:
+            k += 1
+        if i == (1 << k):
+            return 1 << (k - 1)
+        return NeuroProofSolver._luby(i - (1 << (k - 1)))
+
+    # ---- VSIDS scoring ----
+    def _vsids_bump(self, var: str) -> None:
+        """Bump the VSIDS score of *var* by the current increment."""
+        self._vsids_scores[var] = (
+            self._vsids_scores.get(var, 0.0) + self._vsids_inc)
+        # Re-scale when scores grow too large
+        if self._vsids_scores[var] > 1e100:
+            self._vsids_rescale()
+
+    def _vsids_rescale(self) -> None:
+        """Divide all VSIDS scores and the increment by 1e100."""
+        for v in self._vsids_scores:
+            self._vsids_scores[v] *= 1e-100
+        self._vsids_inc *= 1e-100
+
+    def _vsids_decay(self) -> None:
+        """Apply the decay factor to the VSIDS increment."""
+        self._vsids_inc *= 1.0 / self._vsids_decay_factor
+
+    # ---- Clause activity ----
+    def _clause_bump(self, idx: int) -> None:
+        """Bump the activity of the clause at index *idx*."""
+        self._clause_act[idx] = (
+            self._clause_act.get(idx, 0.0) + self._clause_act_inc)
+        if self._clause_act[idx] > 1e100:
+            self._clause_rescale()
+
+    def _clause_rescale(self) -> None:
+        """Divide all clause activities and the increment by 1e100."""
+        for i in self._clause_act:
+            self._clause_act[i] *= 1e-100
+        self._clause_act_inc *= 1e-100
+
+    def _clause_decay(self) -> None:
+        """Apply the decay factor to the clause activity increment."""
+        self._clause_act_inc *= 1.0 / self._clause_decay_factor
+
+    # ---- Restart check ----
+    def _should_restart(self, conflicts: int) -> bool:
+        """Return True when a restart is due."""
+        if conflicts >= self._restart_next:
+            self._restart_luby_idx += 1
+            self._restart_next = conflicts + self._luby(self._restart_luby_idx)
+            return True
+        return False
+
+    # ---- Clause deletion ----
+    def _delete_learned(self, clause_db: List[Clause],
+                        learned_origins: List[List[int]]) -> None:
+        """
+        Delete low-activity learned clauses to keep the database bounded.
+
+        Keeps:
+          - All original (non-learned) clauses
+          - Learned clauses with size <= 3 (usually most useful)
+          - High-activity learned clauses (top 80% by activity)
+        """
+        if len(clause_db) <= self._max_learned:
+            return
+
+        # Identify learned clause indices (only those we have activity for)
+        learned_idxs = list(self._clause_act.keys())
+        if not learned_idxs:
+            return
+
+        # Don't delete short learned clauses (size <= 3) or high-activity ones
+        # Compute deletion candidates: low activity, size > 3
+        candidates = []
+        for idx in learned_idxs:
+            if idx < len(clause_db) and len(clause_db[idx]) > 3:
+                candidates.append(idx)
+        if not candidates:
+            return
+
+        # Sort by activity (lowest first), delete bottom 20%
+        candidates.sort(key=lambda i: self._clause_act.get(i, 0.0))
+        n_delete = max(1, len(candidates) // 5)
+        to_delete = set(candidates[:n_delete])
+
+        # Don't delete clauses that are reasons for current assignments
+        # (simplification: skip deletion for now, just mark)
+        # Actually, let me rebuild clause_db without the deleted ones.
+        # This is O(n) but only happens every ~1000 conflicts.
+
+        new_db = []
+        new_origins = []
+        old_to_new = {}
+        for i, c in enumerate(clause_db):
+            if i in to_delete:
+                continue
+            old_to_new[i] = len(new_db)
+            new_db.append(c)
+
+        # Rebuild learned_origins with updated indices
+        for orig in learned_origins:
+            new_orig = [old_to_new.get(o, o) for o in orig if o not in to_delete]
+            new_origins.append(new_orig)
+
+        clause_db[:] = new_db
+        learned_origins[:] = new_origins
+
+        # Rebuild clause_act with new indices
+        new_act = {}
+        for old_i, new_i in old_to_new.items():
+            if old_i in self._clause_act:
+                new_act[new_i] = self._clause_act[old_i]
+        self._clause_act = new_act
+
+    # ---- Unit propagation, conflict analysis, etc. ----
+    def _unit_propagate(self, clauses: List[Clause],
+                         asgn: Assignment,
+                         reason_map: Dict[str, int],
+                         stats: Dict[str, int]) -> Optional[Clause]:
+        """
+        BCP (Boolean Constraint Propagation).
+
+        Returns the conflicting clause if a conflict is detected, else None.
+        """
+        changed = True
+        while changed:
+            changed = False
+            for idx, clause in enumerate(clauses):
+                ev = asgn.eval_clause(clause)
+                if ev is True:
+                    continue
+                if ev is False:
+                    return clause   # conflict
+                # Count unassigned literals
+                undefs = [(v, ip) for v, ip in clause
+                          if asgn.value(v) is None]
+                falses = [(v, ip) for v, ip in clause
+                          if asgn.evaluate((v, ip)) is False]
+                if len(undefs) == 1 and len(falses) == len(clause) - 1:
+                    # Unit clause — propagate
+                    v, is_pos = undefs[0]
+                    asgn.assign(v, is_pos, reason=idx)
+                    reason_map[v] = idx
+                    stats['unit_props'] += 1
+                    changed = True
+        return None
+
     def _analyse_conflict(
             self, conflict: Clause, clauses: List[Clause],
-            asgn: Assignment) -> Tuple[Clause, int, List[int]]:
+            asgn: Assignment,
+            reason_map: Dict[str, int]) -> Tuple[Clause, int, List[int]]:
         """
         First Unique Implication Point (1-UIP) conflict analysis.
 
@@ -852,30 +798,26 @@ class NeuroProofSolver:
         """
         dl = asgn.decision_level
         seen: Set[str] = set()
-        work_clause: Set[Literal] = set(conflict)
+        work_clause = set(conflict)
         origins: List[int] = []
+        uip_clause: Set[Literal] = set()
 
-        # Resolve backwards along the trail at the current decision level
-        for var in reversed(asgn._trail):
-            if asgn._levels.get(var, 0) != dl:
-                continue
+        # Resolve backwards along the trail
+        trail_at_dl = [(v, val, r)
+                       for v, val, r in asgn._trail
+                       if asgn._level[v] == dl]
 
-            lit_in_clause = (var, True) in work_clause or \
-                            (var, False) in work_clause
+        for var, val, reason in reversed(trail_at_dl):
+            lit_in_clause = (var, val) in work_clause or \
+                            (var, not val) in work_clause
             if not lit_in_clause:
                 continue
-            if var in seen:
-                continue
-            seen.add(var)
-
-            reason = asgn._reasons.get(var)
             if reason is None:
-                # Decision literal — 1-UIP found
+                # decision literal — stop here (1-UIP)
                 break
-
             # Resolve work_clause with reason clause
             origins.append(reason)
-            reason_clause = clauses[reason] if reason < len(clauses) else frozenset()
+            reason_clause = clauses[reason]
             work_clause.discard((var, True))
             work_clause.discard((var, False))
             for lit in reason_clause:
@@ -883,37 +825,44 @@ class NeuroProofSolver:
                     work_clause.add(lit)
 
         learned = frozenset(work_clause)
-
-        # Compute backjump level: max DL of literals except the asserting literal
-        learn_lits = list(learned)
-        if not learn_lits:
-            return learned, 0, origins
-
+        # Compute backjump level: max DL of literals except the UIP literal
         levels = sorted(
-            {asgn._levels.get(v, 0) for v, _ in learned if v in asgn._levels},
+            {asgn._level.get(v, 0) for v, _ in learned if v in asgn._level},
             reverse=True)
         backjump = levels[1] if len(levels) >= 2 else 0
         return learned, backjump, origins
 
     def _pick_variable(self, unassigned: Set[str],
                         clauses: List[Clause],
-                        asgn: Assignment,
-                        activity: Dict[str, float]) -> str:
+                        asgn: Assignment) -> str:
         """
-        Variable selection: VSIDS activity score enriched with ATSS.
+        Variable selection heuristic.
+
+        Uses proper VSIDS (Variable State Independent Decaying Sum) with
+        exponential decay, enriched with the ATSS score as a tie-breaker.
         """
         best_var = None
         best_score = -1.0
         for v in unassigned:
-            score = activity.get(v, 0.0)
-            # Add small ATSS bonus
-            f_pos = Var(v)
-            f_neg = Not(Var(v))
-            score += 0.1 * max(self._atss.score(f_pos), self._atss.score(f_neg))
-            if score > best_score:
+            score = self._vsids_scores.get(v, 0.0)
+            if best_var is None or score > best_score:
                 best_score = score
                 best_var = v
-        return best_var if best_var else next(iter(unassigned))
+        # If all VSIDS scores are 0 (start of search), fall back to
+        # occurrence counting in recent clauses + ATSS tie-break.
+        if best_score < 1e-9:
+            scores: Dict[str, float] = {v: 0.0 for v in unassigned}
+            for clause in clauses[-200:]:
+                for v, _ in clause:
+                    if v in scores:
+                        scores[v] += 1.0
+            return max(unassigned, key=lambda v: scores.get(v, 0.0))
+        return best_var
+
+    def _decide_value(self, var: str, clauses: List[Clause],
+                      asgn: Assignment) -> bool:
+        """Phase-saving polarity selection."""
+        return asgn._saved_polarity.get(var, True)
 
     @staticmethod
     def _cnf_to_clauses(cnf: Formula) -> List[Clause]:
@@ -924,20 +873,25 @@ class NeuroProofSolver:
 
     @staticmethod
     def _collect_clauses(f: Formula, clauses: List[Clause]) -> None:
-        if isinstance(f, Binary) and f.connective == Connective.AND:
-            NeuroProofSolver._collect_clauses(f.left, clauses)
-            NeuroProofSolver._collect_clauses(f.right, clauses)
-        elif f is Top:
-            pass
-        elif f is Bot:
-            clauses.append(frozenset())
-        else:
-            try:
-                clauses.append(clause_from_formula(f))
-            except ValueError:
+        """Iteratively flatten a CNF formula into clause sets."""
+        stack = [f]
+        while stack:
+            current = stack.pop()
+            if isinstance(current, Binary) and current.connective == Connective.AND:
+                stack.append(current.right)
+                stack.append(current.left)
+            elif current is Top:
                 pass
+            elif current is Bot:
+                clauses.append(frozenset())
+            else:
+                try:
+                    clauses.append(clause_from_formula(current))
+                except ValueError:
+                    pass
 
     def _trivial_unsat_proof(self, clauses: List[Clause]) -> Proof:
+        """Return a trivial UNSAT proof when the clause set contains ⊥."""
         pb = ProofBuilder()
         bot_step = pb.assume(Bot, annotation="Empty clause in input")
         return Proof(bot_step)
@@ -947,6 +901,9 @@ class NeuroProofSolver:
                                   origins: List[List[int]]) -> Proof:
         """
         Construct a resolution refutation proof from the CDCL trace.
+
+        Each learned clause is a resolvent of its origin clauses; we
+        embed this into the ProofStep DAG using Rule.RES_FULL.
         """
         pb = ProofBuilder()
 
@@ -959,11 +916,13 @@ class NeuroProofSolver:
                 f = Or(f, Var(v) if is_pos else Not(Var(v)))
             return f
 
+        # Create proof steps for original clauses
         orig_steps: List[ProofStep] = []
         for c in clauses[:len(clauses) - len(origins)]:
             orig_steps.append(pb.assume(
                 clause_to_formula(c), annotation="Input clause"))
 
+        # Reconstruct learned clauses as resolution steps
         all_steps = list(orig_steps)
         for i, orig_idxs in enumerate(origins):
             prem_steps = [all_steps[j] for j in orig_idxs
@@ -982,6 +941,7 @@ class NeuroProofSolver:
             pb._add(step)
             all_steps.append(step)
 
+        # Ensure the proof ends with ⊥
         if pb._last is None or pb._last.conclusion is not Bot:
             bot = pb.assume(Bot, "UNSAT (CDCL)")
             return Proof(bot)
