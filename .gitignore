@@ -33,6 +33,18 @@ coq/._CoqProject
 # Jupyter
 .ipynb_checkpoints/
 
+# Latex
+paper/*.aux
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.bbl
+paper/*.dvi
+paper/*.fls
+paper/*.toc
+paper/*.synctex.gz
+paper/*.fdb_latexmk
+
 # Output
 experiments/figures/*.pdf
 !experiments/figures/.gitkeep
