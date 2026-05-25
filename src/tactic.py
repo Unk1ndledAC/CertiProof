@@ -118,7 +118,8 @@ class TacticEngine:
 
     def __init__(self, atss: Optional[ATSS] = None,
                  max_depth: int = 200,
-                 gnn_atss: Optional['GNNATSS'] = None) -> None:
+                 gnn_atss: Optional['GNNATSS'] = None,
+                 use_fallback: bool = True) -> None:
         self._atss = atss or ATSS()
         self._solver = NeuroProofSolver(atss=self._atss)
         self._max_depth = max_depth
@@ -126,6 +127,7 @@ class TacticEngine:
         # GNN-based tactic selection (optional enhancement over cosine ATSS)
         self._gnn_atss = gnn_atss if _HAS_GNN and gnn_atss is not None else None
         self._gnn_blend: float = 0.5  # weight for GNN vs cosine ATSS
+        self._use_fallback = use_fallback
 
     # ── Public interface ──────────────────────────────────────────────────────
 
@@ -650,8 +652,8 @@ class TacticEngine:
 
         decomposing.sort(key=lambda x: -x[0])
 
-        # Phase 3: solver fallback (always last)
-        fallback = [self._tactic_solver_fallback]
+        # Phase 3: solver fallback (always last, unless disabled)
+        fallback = [self._tactic_solver_fallback] if self._use_fallback else []
 
         return closing + [t for _, t in decomposing] + fallback
 

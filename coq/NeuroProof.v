@@ -451,36 +451,76 @@ Proof.
 Qed.
 
 (* ──────────────────────────────────────────────────────────────
-   §10.  Completeness (statement only — constructive proof in solver.py)
+   §10.  Completeness
    ────────────────────────────────────────────────────────────── *)
 
 (**
+  Lemma eval_interp_bridge:
+    The boolean semantics (eval) and propositional semantics
+    (interp) coincide for classical propositional logic.
+    This bridge is the key to connecting Tautology (defined
+    via eval) with the entailment relation ⊢ (defined via interp).
+*)
+Lemma eval_interp_bridge : forall v f,
+  interp v f <-> eval v f = true.
+Proof.
+  intros v f. induction f; simpl.
+  - (* FVar *) split; auto.
+  - (* FTop *) split; auto.
+  - (* FBot *) split; intro H; [contradiction | discriminate].
+  - (* FNot *) rewrite <- IHf. split.
+    + intro H. apply negb_true_iff.
+      apply Bool.not_true_iff_false. exact H.
+    + intro H. apply negb_true_iff in H.
+      apply Bool.not_true_iff_false. exact H.
+  - (* FAnd *) rewrite <- IHf1, <- IHf2. split.
+    + intros [H1 H2]. apply andb_true_iff. auto.
+    + intro H. apply andb_true_iff in H.
+      destruct H as [H1 H2]. split; auto.
+  - (* FOr *) rewrite <- IHf1, <- IHf2. split.
+    + intros [H1|H2]; [apply orb_true_iff; left | apply orb_true_iff; right]; auto.
+    + intro H. apply orb_true_iff in H.
+      destruct H as [H1|H2]; [left|right]; auto.
+  - (* FImp *) rewrite <- IHf1, <- IHf2. split.
+    + intro H. unfold implb. destruct (eval v f1) eqn:Ev1.
+      * apply IHf1 in Ev1. apply H in Ev1.
+        apply IHf2 in Ev1. exact Ev1.
+      * reflexivity.
+    + intro H. unfold implb in H. intro Hf1.
+      apply IHf1 in Hf1. destruct (eval v f1) eqn:Ev1.
+      * apply IHf2. apply H.
+      * rewrite Ev1 in Hf1. exact Hf1.
+  - (* FIff *) rewrite <- IHf1, <- IHf2. split.
+    + intros [Hfwd Hbwd]. apply eqb_true_iff.
+      destruct (eval v f1) eqn:E1, (eval v f2) eqn:E2; auto.
+      * apply IHf1 in E1. apply Hfwd in E1.
+        apply IHf2 in E1. rewrite E2 in E1. discriminate.
+      * apply IHf2 in E2. apply Hbwd in E2.
+        apply IHf1 in E2. rewrite E1 in E2. discriminate.
+    + intro H. apply eqb_true_iff in H. split.
+      * intro Hf1. apply IHf1 in Hf1. rewrite Hf1 in H.
+        apply IHf2. rewrite <- H. exact Hf1.
+      * intro Hf2. apply IHf2 in Hf2. rewrite Hf2 in H.
+        apply IHf1. destruct (eval v f1); auto. discriminate.
+Qed.
+
+(**
   Theorem (Completeness):
-    Every classically valid propositional formula is provable in
-    the NeuroProof calculus.
+    Every classically valid propositional formula is provable
+    in the NeuroProof calculus.
 
-  Proof sketch:
-    By induction on formula structure, using the CDCL-based solver
-    (solver.py) as a decision procedure and the ProofBuilder API to
-    construct the witnessing derivation.
-
-  A full formal Coq proof would require a formalised CDCL solver,
-  which is beyond the scope of this paper.  We state completeness
-  as a theorem and validate it experimentally in §5.
+  Proof: Tautology φ means eval v φ = true for all valuations v.
+  By eval_interp_bridge, this is equivalent to interp v φ, which
+  is the definition of [] ⊢ φ (empty context entailment).
 *)
 Theorem completeness_statement : forall (φ : Formula),
   Tautology φ ->
   [] ⊢ φ.
 Proof.
-  (* Proof by inspection of semantic cases via classical decidability.
-     Omitted here; see Troelstra & Schwichtenberg (2000) §1.3. *)
   intros φ Htaut.
-  intro v. intro _.
-  unfold Tautology in Htaut.
-  (* Reconstruct from semantics using classical logic *)
-  assert (H := Htaut v).
-  (* We need the bridge lemma from §5 *)
-  admit.
-Admitted.
+  unfold Entails. intro v. intro Hctx.
+  apply eval_interp_bridge.
+  apply Htaut.
+Qed.
 
 (* End of NeuroProof.v *)

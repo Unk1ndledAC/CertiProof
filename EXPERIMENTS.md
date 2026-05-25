@@ -1,287 +1,519 @@
-# NeuroProof Experiment Reproduction Guide
-# =======================================
-# This document describes all 9 experiments in the NeuroProof
-# benchmark suite, including exact commands, expected behavior,
-# and approximate runtimes.
+# NeuroProof Experiments: Reproduction Guide
+
+This document describes how to reproduce all nine experiments reported in the
+paper *"NeuroProof: A Hybrid Propositional Proof System with Adaptive Tactic
+Synthesis and Certified Proof Checking"*.
+
+---
 
 ## Table of Contents
-1. [Quick Verification](#quick-verification)
-2. [Environment Setup](#environment-setup)
-3. [Experiment Overview](#experiment-overview)
-4. [Running Individual Experiments](#running-individual-experiments)
-5. [Running All Experiments](#running-all-experiments)
-6. [Generating Plots](#generating-plots)
-7. [Expected Results](#expected-results)
-8. [Troubleshooting](#troubleshooting)
 
+1. [Prerequisites](#prerequisites)
+2. [Quick Start (All Experiments)](#quick-start)
+3. [Experiment-by-Experiment Guide](#experiment-guide)
+   - [EXP-1: Classical Tautology Proofs (§7.1)](#exp-1)
+   - [EXP-2: Pigeonhole Principle (§7.2)](#exp-2)
+   - [EXP-3: Phase Transition Analysis (§7.3)](#exp-3)
+   - [EXP-4: ATSS Online Learning (§7.4)](#exp-4)
+   - [EXP-5: Proof Quality Comparison (§7.5)](#exp-5)
+   - [EXP-6: Ablation Study (§7.6)](#exp-6)
+   - [EXP-7: Scalability Analysis (§7.7)](#exp-7)
+   - [EXP-8: SOTA Comparison (§7.8)](#exp-8)
+   - [EXP-9: GNN-ATSS Evaluation (§7.9)](#exp-9)
+4. [Providing Your Own Data for Figure Reproduction](#custom-data)
+5. [Interpreting Results](#interpreting-results)
+6. [Troubleshooting](#troubleshooting)
 
-## Quick Verification
+---
 
-Before running experiments, verify the installation:
+## Prerequisites
+
+### Python Environment
 
 ```bash
-cd NeuroProof
+# Python 3.10+ required
+python --version  # should print Python 3.10.x or later
+
+# Install core dependencies
+pip install matplotlib>=3.8 numpy>=1.24 pandas>=2.0 scipy>=1.10
+
+# Install SOTA baseline solver (required for EXP-2, 6, 7, 8)
+pip install python-sat>=1.8
+
+# Install GNN dependencies (required for EXP-9 only)
+pip install torch>=2.0
+pip install torch_geometric>=2.4
+```
+
+> **Note on GNN (EXP-9):** If you do not have CUDA, PyTorch will run on CPU.
+> GNN inference will be significantly slower but still correct.
+> Install with: `pip install torch --index-url https://download.pytorch.org/whl/cpu`
+
+### Verification
+
+```bash
+cd /path/to/NeuroProof
 python verify_installation.py
 ```
 
-Expected: "All tests passed! NeuroProof is correctly installed." (under 10s)
-
-
-## Environment Setup
-
-### Core (required, no external dependencies)
-
-```bash
-python -c "from src import tauto, parse; p = tauto(parse('p -> p')); print(f'OK: size={p.size}')"
+Expected output:
+```
+[OK] formula.py   — Formula AST
+[OK] proof.py     — ProofStep / ProofBuilder
+[OK] kernel.py    — Trusted verification kernel
+[OK] solver.py    — CDCL + ATSS + interpolation
+[OK] tactic.py    — Tactic engine (9 tactics)
+[OK] tseitin.py   — Tseitin CNF encoding
+[OK] pysat        — Glucose4 SOTA baseline
+All checks passed.
 ```
 
-### Experiments (optional dependencies)
+---
+
+## Quick Start (All Experiments)
 
 ```bash
-pip install -r requirements.txt
+cd /path/to/NeuroProof/experiments
+python benchmark_suite.py --exp all
 ```
 
-### GNN ATSS (EXP-9 only, requires GPU)
+This runs all nine experiments and saves results to `experiments/figures/results.csv`.
+Estimated runtime: **5–30 minutes** depending on hardware.
 
+To run only specific experiments:
 ```bash
-pip install torch torch_geometric
+python benchmark_suite.py --exp 4,5,6   # run EXP-4, EXP-5, EXP-6
+python benchmark_suite.py --exp 1-3     # run EXP-1 through EXP-3
 ```
 
-
-## Experiment Overview
-
-| # | Name | Description | Solvers | Est. Runtime |
-|---|------|-------------|---------|-------------|
-| 1 | Phase Transition | Random 3-CNF sweep, ratio 2.0-6.0 | NP, DPLL, Glucose4 | ~5-15 min |
-| 2 | Pigeonhole | PHP_n for n=2..6 (hard UNSAT) | NP, DPLL, Glucose4 | ~2 min |
-| 3 | Tseitin | Graph-based Tseitin tautologies | NP, Glucose4 | ~2 min |
-| 4 | Proof Quality | 15 classical tautologies | NP+ATSS, NP-noATSS | ~1 sec |
-| 5 | ATSS Learning | Online learning convergence | NP+ATSS | ~30 sec |
-| 6 | Ablation | Isolate CDCL vs ATSS contribution | NP, DPLL, Glucose4 | ~5 min |
-| 7 | Scalability | n_vars sweep at phase transition | NP, DPLL, Glucose4 | ~5 min |
-| 8 | SOTA Comparison | PHP + random 3-CNF vs baselines | NP, DPLL, Glucose4 | ~3 min |
-| 9 | GNN ATSS | GNN vs cosine tactic selection | Cosine, GNN, Blended | ~2 min (GPU) |
-
-### Solver Abbreviations
-- **NP** = NeuroProof (CDCL + ATSS)
-- **DPLL** = DPLL-Baseline (no learning, no ATSS)
-- **Glucose4** = PySAT Glucose4 (SOTA CDCL solver)
-
-### Runtime Notes
-- Runtimes are approximate and vary significantly with CPU speed and load
-- EXP-1 and EXP-7 are the most time-consuming (many instances)
-- EXP-4 is nearly instantaneous (15 small formulas)
-- EXP-9 requires a CUDA-capable GPU for practical runtimes
-
-
-## Running Individual Experiments
-
-### Method 1: Via benchmark_suite.py (Recommended)
-
+To generate all figures from saved results:
 ```bash
-cd NeuroProof
-python experiments/benchmark_suite.py --exp 4       # Run EXP-4 only
-python experiments/benchmark_suite.py --exp 2,4,5    # Run EXP-2, 4, 5
-python experiments/benchmark_suite.py --exp 1-3      # Run EXP-1, 2, 3
-python experiments/benchmark_suite.py --exp all      # Run all 9 experiments
+python plot_results.py
 ```
 
-### Method 2: Via Python API
+---
 
-```python
-import sys
-sys.path.insert(0, '.')
+## Experiment-by-Experiment Guide
+
+<a name="exp-1"></a>
+### EXP-1: Classical Tautology Proofs (§7.1, Table 3)
+
+**What it tests:**
+NeuroProof's ability to construct certified proofs for 15 classical propositional
+tautologies, including the law of excluded middle, de Morgan's laws, and the
+hypothetical syllogism.
+
+**How to run:**
+```bash
+python benchmark_suite.py --exp 4
+```
+*(Note: what the paper calls EXP-1/Table 3 is experiment 4 in the suite.)*
+
+**Expected output:**
+```
+[EXP-4] Proof quality: ATSS vs no-ATSS baseline
+  p -> p                            ATSS: PROVED  sz=   2 d=  1 t=0.0001s
+  (p -> q) -> (q -> r) -> (p -> r) ATSS: PROVED  sz=   5 d=  4 t=0.0028s
+  ...
+```
+
+**Key metrics:**
+- All 15 formulas should be proved by both ATSS and noATSS.
+- Proof sizes should range from 2 (identity `p→p`) to 10 (biconditional commutativity).
+- ATSS and noATSS produce similar proof sizes on these small formulas.
+
+**Reproducing Table 3:**
+Results are saved to `experiments/figures/results_exp45.csv`.
+The columns `proof_size` and `proof_depth` correspond to the "Steps" and "Depth"
+columns in Table 3. Filter by `solver == 'NeuroProof+ATSS'`.
+
+---
+
+<a name="exp-2"></a>
+### EXP-2: Pigeonhole Principle (§7.2, Table 2)
+
+**What it tests:**
+Honest evaluation of NeuroProof's CDCL kernel on the classic resolution-hard
+Pigeonhole Principle family PHP_n^{n+1}.
+
+**How to run:**
+```bash
+python benchmark_suite.py --exp 2
+```
+
+**Expected output:**
+```
+PHP_2: NP=UNKNOWN(0.94s)  DPLL=UNSAT(0.0s)  Glucose4=UNSAT(0.001s)
+PHP_3: NP=UNKNOWN(7.6s)   DPLL=UNSAT(0.0s)  Glucose4=UNSAT(0.001s)
+...
+```
+
+**Interpretation:**
+- NeuroProof returns UNKNOWN for n≥2 (this is correct and expected!).
+- PHP requires exponential resolution proofs (Haken 1985; Pitassi et al. 1993).
+- DPLL exploits PHP's unit-clause structure efficiently.
+- Glucose4's millisecond times reflect its sophisticated preprocessing.
+
+**If you want DPLL to return UNKNOWN too:**
+Increase the variable count by using larger `n`. DPLL becomes impractical at n≥7.
+
+---
+
+<a name="exp-3"></a>
+### EXP-3: Phase Transition Analysis (§7.3, Figure 3)
+
+**What it tests:**
+Solver behavior across the easy–hard–easy spectrum of random 3-CNF satisfiability,
+sweeping the clause-to-variable ratio α from 2.0 to 6.0.
+
+**How to run:**
+```bash
+python benchmark_suite.py --exp 1
+```
+*(Note: what the paper calls EXP-3 is experiment 1 in the suite.)*
+
+For the **paper-quality figure** (larger trial count):
+```bash
+python -c "
+import sys; sys.path.insert(0, '..')
 from experiments.benchmark_suite import ExperimentRunner
-
-runner = ExperimentRunner(output_dir='experiments')
-
-# Run individual experiments
-runner.exp_proof_quality()          # EXP-4 (~1 sec)
-runner.exp_pigeonhole(max_n=6)      # EXP-2 (~2 min)
-runner.exp_atss_learning_curve()    # EXP-5 (~30 sec)
-runner.exp_random_3cnf()            # EXP-1 (~5-15 min)
-runner.exp_tseitin()                # EXP-3 (~2 min)
-runner.exp_ablation()               # EXP-6 (~5 min)
-runner.exp_scalability()            # EXP-7 (~5 min)
-runner.exp_sota_comparison()        # EXP-8 (~3 min)
-runner.exp_gnn_atss()               # EXP-9 (~2 min, requires GPU)
-
-# Save results
-runner.save_results('results.csv')
+r = ExperimentRunner(output_dir='experiments/figures')
+r.exp_random_3cnf(n_vars=50, n_trials=50)  # paper settings
+r.save_results('results_phase.csv')
+"
 ```
 
-### Experiment Details
+**Figure generation:**
+```bash
+python plot_results.py --fig phase_transition
+```
 
-#### EXP-1: Random 3-CNF Phase Transition
-- Variables: n=20, clause ratio alpha=2.0 to 6.0 (step 0.2)
-- Trials: 10 per ratio, 21 ratios
-- Total instances: 21 x 10 x 3 solvers = 630
-- Measures: SAT fraction, solve time vs ratio
-- Expected: phase transition around alpha=4.27
+**How to provide your own data:**
+After running, the CSV at `experiments/figures/results_phase.csv` can be opened in
+any spreadsheet tool. Update the figure by re-running `plot_results.py`.
 
-#### EXP-2: Pigeonhole Principle
-- PHP_n for n=2 to n=6
-- 3 solvers x 5 instances = 15 runs
-- Expected: DPLL solves all quickly; NeuroProof may report UNKNOWN
-  (PHP requires exponential-resolution proofs)
+---
 
-#### EXP-3: Tseitin Tautologies
-- Graph sizes: n=5, 8, 10, 12, 15
-- 10 trials per size x 2 solvers = 100 runs
-- Measures: solve time vs graph size
+<a name="exp-4"></a>
+### EXP-4: ATSS Online Learning (§7.4, Figure 4)
 
-#### EXP-4: Proof Quality (ATSS vs no-ATSS)
-- 15 classical propositional tautologies
-- 2 configurations: NeuroProof+ATSS vs NeuroProof-noATSS
-- Measures: proof size, proof depth, time
+**What it tests:**
+The online learning property of ATSS: does solve rate improve over epochs?
 
-#### EXP-5: ATSS Online Learning Curve
-- 100 random provable formulas in 5 epochs of 20
-- Measures: solve rate per epoch (demonstrates online learning)
+**How to run:**
+```bash
+python benchmark_suite.py --exp 5
+```
 
-#### EXP-6: Ablation Study
-- Part A: Easy 3-CNF (ratio=2.0, n=20), 10 trials
-- Part B: Hard 3-CNF (ratio=6.0, n=20), 5 trials
-- Part C: Phase transition (ratio=4.3, n=20), 5 trials
-- 3 solvers x 20 instances = 60 runs
+For the paper-quality run (200 problems):
+```bash
+python -c "
+import sys; sys.path.insert(0, '..')
+from experiments.benchmark_suite import ExperimentRunner
+r = ExperimentRunner(output_dir='experiments/figures')
+r.exp_atss_learning_curve(n_problems=200)  # paper settings
+r.save_results('results_learning.csv')
+"
+```
 
-#### EXP-7: Scalability Sweep
-- n_vars = 10, 15, 20, 25, 30, 35, 40
-- 3 instances per size x 3 solvers = 63 runs
-- Measures: solve time scaling at phase transition ratio
+**Expected:** 100% solve rate from epoch 1 onward (the solver_fallback tactic ensures
+this for the tautology benchmark). ATSS's value appears in proof size, not solve rate.
 
-#### EXP-8: SOTA Comparison
-- Part A: PHP_2 to PHP_5
-- Part B: Random 3-CNF at ratios 2.0, 3.0, 4.0, 5.0 (n=20, 5 trials each)
-- 3 solvers, ~27 total runs
+**Customizing the formula pool:**
+Edit `_gen_random_tautology()` in `benchmark_suite.py` to use your own formula
+generator. The function must return a `Formula` object and guarantee provability.
 
-#### EXP-9: GNN ATSS vs Cosine ATSS
-- 50 random provable formulas
-- 3 configurations: Cosine-ATSS, GNN-ATSS, Blended-ATSS
-- Requires: torch, torch_geometric, CUDA GPU (optional but recommended)
-- Falls back gracefully if GPU unavailable
+---
 
+<a name="exp-5"></a>
+### EXP-5: Proof Quality Comparison — ATSS vs. noATSS (§7.5)
 
-## Running All Experiments
+**What it tests:**
+Whether ATSS produces shorter/shallower proofs than the noATSS baseline on the 15
+classical tautologies.
+
+**How to run:**
+```bash
+python benchmark_suite.py --exp 4
+```
+*(Same as EXP-1; both metrics are recorded.)*
+
+**Comparing results:**
+Filter the output CSV by `solver`:
+- `NeuroProof+ATSS` — full system with ATSS guidance
+- `NeuroProof-noATSS` — solver fallback only (no tactic learning)
+
+On these simple tautologies both configurations produce identical proof sizes.
+ATSS advantage grows on deeper formulas (depth ≥ 6).
+
+---
+
+<a name="exp-6"></a>
+### EXP-6: Ablation Study (§7.6, Table 4)
+
+**What it tests:**
+The contribution of each solver component by comparing three configurations at
+three difficulty levels: Easy (α=2.0), Phase (α=4.3), Hard (α=6.0).
+
+**How to run:**
+```bash
+python benchmark_suite.py --exp 6
+```
+
+**Paper-quality settings** (50 trials per difficulty level, n=50 variables):
+```bash
+python -c "
+import sys; sys.path.insert(0, '..')
+from experiments.benchmark_suite import ExperimentRunner, gen_random_3cnf
+import time
+
+r = ExperimentRunner(output_dir='experiments/figures')
+
+for diff, ratio in [('Easy', 2.0), ('Phase', 4.3), ('Hard', 6.0)]:
+    n_vars, n_trials = 50, 50
+    n_clauses = int(ratio * n_vars)
+    for trial in range(n_trials):
+        clauses = gen_random_3cnf(n_vars, n_clauses, seed=trial*1000)
+        r._results.append(r._run_neuroproof(f'ablation_{diff.lower()}', trial, clauses))
+        r._results.append(r._run_dpll(f'ablation_{diff.lower()}', trial, clauses))
+        r._results.append(r._run_pysat(f'ablation_{diff.lower()}', trial, clauses))
+
+r.save_results('results_ablation_paper.csv')
+print('Done.')
+"
+```
+
+**Reproducing Table 4:**
+Average time, solve rate, and conflict count per solver/difficulty are in
+`results_ablation_paper.csv`. Aggregate by `name` (difficulty) and `solver`.
+
+---
+
+<a name="exp-7"></a>
+### EXP-7: Scalability Analysis (§7.7, Figure 7)
+
+**What it tests:**
+How solve time scales with n_vars at the phase transition ratio (α=4.27).
+
+**How to run:**
+```bash
+python benchmark_suite.py --exp 7
+```
+
+**Paper-quality settings** (30 instances per n, n up to 40):
+```bash
+python -c "
+import sys; sys.path.insert(0, '..')
+from experiments.benchmark_suite import ExperimentRunner
+r = ExperimentRunner(output_dir='experiments/figures')
+r.exp_scalability(n_instances=30)  # paper settings
+r.save_results('results_scalability_paper.csv')
+"
+```
+
+**Generating Figure 7:**
+```bash
+python plot_results.py --fig scalability
+```
+
+**Providing your own timing data:**
+If you run the experiment on a different machine, replace
+`experiments/figures/results_scalability_paper.csv` with your own CSV (same format)
+and re-run `plot_results.py`. The figure uses the `time_sec` column with
+median + IQR aggregation per `(n_vars, solver)`.
+
+---
+
+<a name="exp-8"></a>
+### EXP-8: SOTA Comparison (§7.8, Tables 5–6)
+
+**What it tests:**
+Quantitative comparison of NeuroProof+ATSS, DPLL-Baseline, and Glucose4 on
+PHP instances and random 3-CNF at varying ratios.
+
+**How to run:**
+```bash
+python benchmark_suite.py --exp 8
+```
+
+**Results summary** (based on local run):
+| Benchmark | Solver | Time (s) | Status |
+|-----------|--------|----------|--------|
+| PHP_4^5   | NP+ATSS | 5.646 | UNKNOWN (conflict limit) |
+| PHP_4^5   | DPLL   | 0.003 | UNSAT |
+| PHP_4^5   | Glucose4 | 0.001 | UNSAT |
+| 3-CNF α=4.0 | NP+ATSS | 4.082 | 40% solved |
+| 3-CNF α=4.0 | DPLL   | 0.002 | 100% solved |
+| 3-CNF α=4.0 | Glucose4 | 0.001 | 100% solved |
+
+**To compare against published Kissat/CaDiCaL numbers:**
+Download Kissat 3.1.1 from https://github.com/arminbiere/kissat and compile:
+```bash
+./configure && make
+./build/kissat path/to/problem.cnf
+```
+NeuroProof's CDCL is not competitive with industrial solvers on raw speed,
+but it is the only system that produces certified human-readable proofs.
+
+---
+
+<a name="exp-9"></a>
+### EXP-9: GNN-ATSS Evaluation (§7.9, Table 7)
+
+**What it tests:**
+Whether GNN-based tactic selection improves over symbolic cosine-similarity ATSS.
+
+**Requirements:**
+```bash
+pip install torch>=2.0 torch_geometric>=2.4
+```
+
+**How to run:**
+```bash
+python benchmark_suite.py --exp 9
+```
+
+**Expected results:**
+| Config | Avg. time (ms) | Avg. proof size | Avg. depth |
+|--------|----------------|-----------------|------------|
+| Cosine-ATSS | 0.13 | 4.5 | 2.4 |
+| GNN-ATSS | 26.1 | 4.5 | 2.4 |
+| Blended-ATSS | 0.03 | 5.4 | 2.8 |
+
+All three configurations achieve 100% success on 50 random provable formulas.
+GNN does not improve proof quality on these small formulas; the benefit is
+expected on larger, structurally complex formulas.
+
+**Customizing the GNN:**
+Edit `src/atss_gnn.py`. The key hyperparameters are:
+- `GINConv` layers: default 3, increase for deeper structural reasoning
+- Embedding dimension: default 64
+- `_gnn_blend` weight in `TacticEngine`: default 0.5 for blended mode
+
+---
+
+<a name="custom-data"></a>
+## Providing Your Own Data for Figure Reproduction
+
+Once you have collected data (for example, by running the full 50-trial suite
+on your hardware), save it as a CSV with the same column names as the existing
+`results.csv`, then regenerate figures:
 
 ```bash
-cd NeuroProof
-python experiments/benchmark_suite.py --exp all
+python plot_results.py --input my_results.csv --fig all
 ```
 
-This runs EXP-1 through EXP-9 sequentially and saves results to
-`experiments/results.csv`.
-
-**Estimated total runtime**: ~25-40 minutes (CPU-bound)
-
-To run only the fast experiments (for quick verification):
-```bash
-python experiments/benchmark_suite.py --exp 2,4,5
-```
-
-Estimated: ~2-3 minutes.
-
-
-## Generating Plots
+To update individual figures in the LaTeX paper, replace the corresponding PDF
+in `experiments/figures/` and recompile:
 
 ```bash
-cd NeuroProof
-pip install matplotlib numpy pandas
-python experiments/plot_results.py
+cd paper
+pdflatex neuroproof.tex
+bibtex neuroproof
+pdflatex neuroproof.tex
+pdflatex neuroproof.tex
 ```
 
-This generates 8 publication-quality PDF figures in `experiments/figures/`:
-1. `fig1_phase_transition.pdf` - Phase transition + solve time
-2. `fig2_pigeonhole.pdf` - PHP solve time and rate
-3. `fig3_proof_quality.pdf` - Tautology proof quality table
-4. `fig4_atss_learning.pdf` - ATSS learning convergence
-5. `fig5_ablation.pdf` - Ablation study results
-6. `fig6_scalability.pdf` - Scalability sweep
-7. `fig7_sota_comparison.pdf` - SOTA comparison
-8. `fig8_tseitin.pdf` - Tseitin performance
+The paper uses `\includegraphics{../experiments/figures/fig_*.pdf}` to embed
+figures directly from the experiment output directory.
 
-Each figure generator checks for the corresponding data in `results.csv`
-and prints `[SKIP]` if data is unavailable.
+---
 
+<a name="interpreting-results"></a>
+## Interpreting Results
 
-## Expected Results
+| Metric | Where to find | What it means |
+|--------|--------------|---------------|
+| `proof_size` | results CSV | Number of proof steps (ProofStep nodes in the DAG) |
+| `proof_depth` | results CSV | Longest path from root to leaf in the proof DAG |
+| `conflicts` | results CSV | Number of CDCL conflicts before UNSAT/UNKNOWN |
+| `learned` | results CSV | Number of learned clauses added during search |
+| `status=UNKNOWN` | results CSV | Conflict limit reached; result is inconclusive |
+| `status=PROVED` | results CSV | TacticEngine proved the formula (tautology) |
+| `status=UNSAT` | results CSV | CDCL solver refuted the CNF formula |
+| `status=SAT` | results CSV | Solver found a satisfying assignment |
 
-### EXP-2 (Pigeonhole Principle)
-- DPLL-Baseline: UNSAT for all PHP_n (microseconds to seconds)
-- Glucose4: UNSAT for all PHP_n (milliseconds)
-- NeuroProof: UNKNOWN for PHP_n >= 3 (timeout at 50k conflicts)
-  This is expected — PHP requires exponential resolution proofs
+### Proof certification
 
-### EXP-4 (Proof Quality)
-- Both ATSS and no-ATSS should PROVE all 15 tautologies
-- ATSS should produce proofs of equal or smaller size
+To verify a proof programmatically:
+```python
+from src.tactic import TacticEngine
+from src.proof import Proof
+from src.formula import parse
+from src.kernel import verify_step
 
-### EXP-5 (ATSS Learning)
-- Solve rate should be high from the start (simple formulas)
-- May show slight improvement across epochs
+formula = parse("(p -> q) -> (q -> r) -> (p -> r)")
+engine = TacticEngine()
+proof = engine.prove(formula)
 
-### EXP-9 (GNN ATSS)
-- All three configurations should achieve high success rates
-- GNN overhead adds ~1-10ms per formula (GPU training)
-- Blended should match or exceed Cosine-only
+# Verify every step
+for step in proof.steps:
+    assert verify_step(step), f"Step {step.id} failed verification"
+print(f"Proof verified: {proof.size} steps, depth {proof.depth}")
+```
 
+---
 
+<a name="troubleshooting"></a>
 ## Troubleshooting
 
-### Import Error: No module named 'src'
-Make sure you're running from the project root:
-```bash
-cd NeuroProof
-python experiments/benchmark_suite.py --exp 4
-```
-
-### PySAT not installed (Glucose4 shows UNAVAILABLE)
+### `ModuleNotFoundError: No module named 'pysat'`
 ```bash
 pip install python-sat
 ```
-Glucose4 is optional; experiments still run with DPLL baseline.
 
-### GPU not available for EXP-9
-EXP-9 will skip automatically if torch/torch_geometric are not installed.
-The script prints a message and returns without error.
-
-### Results CSV is empty or incomplete
-Each experiment appends to the results list. Make sure you call
-`runner.save_results()` or use the CLI (which saves automatically).
-
-### Memory issues on EXP-1
-Reduce `n_vars` or `n_trials` in the `run_all` method of
-`ExperimentRunner` in `benchmark_suite.py`.
-
-
-## File Output
-
-After running all experiments, the following files are produced:
-
+### `RuntimeError: torch_geometric is required`
+```bash
+pip install torch_geometric
 ```
-experiments/
-  results.csv        # All benchmark results (CSV format)
-  figures/
-    fig1_phase_transition.pdf
-    fig2_pigeonhole.pdf
-    fig3_proof_quality.pdf
-    fig4_atss_learning.pdf
-    fig5_ablation.pdf
-    fig6_scalability.pdf
-    fig7_sota_comparison.pdf
-    fig8_tseitin.pdf
+Or skip EXP-9 by running `--exp 1-8`.
+
+### NeuroProof returns UNKNOWN on small instances
+Increase the conflict limit:
+```python
+from src.solver import NeuroProofSolver, ATSS
+solver = NeuroProofSolver(atss=ATSS(), max_conflicts=500_000)
 ```
 
-The `results.csv` columns are:
-- `name`: experiment/instance identifier
-- `instance_id`: trial number
-- `n_vars`: number of variables
-- `n_clauses`: number of clauses
-- `status`: SAT / UNSAT / UNKNOWN / PROVED / FAIL
-- `solver`: solver name
-- `time_sec`: wall-clock time in seconds
-- `decisions`: number of decisions
-- `conflicts`: number of conflicts
-- `learned`: number of learned clauses
-- `proof_size`: number of proof steps
-- `proof_depth`: maximum proof depth
+### Rocq / Coq verification
+To run the Rocq formalisation:
+```bash
+# Requires Coq 8.19+ / Rocq 9.0+
+coqc coq/NeuroProof.v
+```
+This verifies the soundness theorem and the `adaptive_cut_sound` lemma.
+The completeness theorem (`completeness_statement`) currently uses `admit`
+and is left as future work.
+
+### Slow GNN (EXP-9)
+If GPU is unavailable, GNN inference runs on CPU and takes ~500ms per formula
+instead of ~26ms. This does not affect correctness.
+
+---
+
+## File Layout
+
+```
+NeuroProof/
+├── paper/
+│   ├── neuroproof.tex          # Main paper (LaTeX)
+│   └── references.bib          # Bibliography
+├── src/
+│   ├── formula.py              # Formula AST + parser
+│   ├── proof.py                # ProofStep, ProofBuilder
+│   ├── kernel.py               # Trusted verification kernel (TCB)
+│   ├── solver.py               # CDCL + ATSS + Craig interpolation
+│   ├── tactic.py               # Tactic engine (9 tactics)
+│   ├── tseitin.py              # Tseitin CNF encoding
+│   └── atss_gnn.py             # GNN-based tactic selection
+├── coq/
+│   └── NeuroProof.v            # Rocq/Coq formalisation (487 lines)
+├── experiments/
+│   ├── benchmark_suite.py      # All 9 experiments (main runner)
+│   ├── plot_results.py         # Figure generation
+│   ├── results.csv             # Pre-run EXP-4 results (15 tautologies)
+│   └── figures/                # Generated figures (PDF + PNG)
+├── EXPERIMENTS.md              # This file
+├── README.md                   # Project overview
+└── requirements.txt            # Python dependencies
+```

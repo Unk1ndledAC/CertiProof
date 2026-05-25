@@ -61,8 +61,9 @@ M.~J.~H. Heule, W.~A. {Hunt Jr.}, M.~Kaufmann, and N.~Wetzler, ``Efficient,
   0.4em\relax Springer, 2017, pp. 269--284.
 
 \bibitem{Marques-Silva1999}
-J.~{a}o P.~Marques-Silva and K.~A. Sakallah, ``{GRASP}: A search algorithm for
-  propositional satisfiability,'' vol.~48, no.~5, 1999, pp. 506--521.
+J.~Marques-Silva and K.~Sakallah, ``Grasp: a search algorithm for propositional
+  satisfiability,'' \emph{IEEE Transactions on Computers}, vol.~48, no.~5, pp.
+  506--521, 1999.
 
 \bibitem{EenSorensson2003}
 N.~E{\'{e}}n and N.~S\"{o}rensson, ``An extensible {SAT}-solver,'' in
@@ -248,6 +249,21 @@ A.~Biere, K.~Fazekas, M.~Fleury, and M.~Heisinger, ``{SAT} competition 2024:
   Solver and benchmark descriptions,'' 2024. [Online]. Available:
   \url{https://helda.helsinki.fi/server/api/core/bitstreams/3f1f286b-3def-49e9-98ba-f887b1bc250e/content}
 \BIBentrySTDinterwordspacing
+
+\bibitem{Cheeseman1986}
+P.~Cheeseman, B.~Kanefsky, and W.~M. Taylor, ``Where the really hard problems
+  are,'' \emph{Proceedings of the 12th International Joint Conference on
+  Artificial Intelligence ({IJCAI}'91)}, pp. 331--337, 1991.
+
+\bibitem{Kirkpatrick1994}
+S.~Kirkpatrick and B.~Selman, ``Critical behavior in the satisfiability of
+  random boolean expressions,'' \emph{Science}, vol. 264, no. 5163, pp.
+  1297--1301, 1994.
+
+\bibitem{Dubois2001}
+O.~Dubois, R.~Monasson, B.~Selman, and R.~Zecchina, ``Phase transitions in
+  combinatorial problems,'' \emph{Theoretical Computer Science}, vol. 265, no.
+  1--2, pp. 3--25, 2001.
 
 \bibitem{BenSasson2002}
 E.~Ben-Sasson, R.~Impagliazzo, and A.~Wigderson, ``Near-optimal separation of
