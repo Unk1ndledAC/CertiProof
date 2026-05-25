@@ -2,7 +2,7 @@
 % references.bib
 % Bibliography for "NeuroProof: A Hybrid Propositional Proof System
 %   with Adaptive Tactic Synthesis and Certified Proof Checking"
-% All entries verified with DOI or arXiv links.
+% Targeted venues: LICS 2027 / CAV 2027
 % ============================================================
 
 % ----------------------------------------------------------------
@@ -18,18 +18,6 @@
   pages     = {36--50},
   year      = {1979},
   doi       = {10.2307/2273702},
-  publisher = {Association for Symbolic Logic}
-}
-
-@article{Razborov2004,
-  author    = {Alexander A. Razborov},
-  title     = {Resolution Lower Bounds for the Weak Pigeonhole Principle},
-  journal   = {Journal of the ACM},
-  volume    = {51},
-  number    = {3},
-  pages     = {385--432},
-  year      = {2004},
-  doi       = {10.1145/990308.990313}
 }
 
 @article{Ben-Sasson2001,
@@ -40,7 +28,7 @@
   number    = {2},
   pages     = {149--169},
   year      = {2001},
-  doi       = {10.1145/375827.375835}
+  doi       = {10.1145/375827.375835},
 }
 
 @article{Beame1998,
@@ -50,17 +38,14 @@
   volume    = {65},
   pages     = {66--89},
   year      = {1998},
-  url       = {https://eccc.weizmann.ac.il/report/1998/067/}
 }
 
-@inproceedings{Krajicek1995,
+@book{Krajicek1995,
   author    = {Jan Kraj\'{\i}\v{c}ek},
   title     = {Bounded Arithmetic, Propositional Logic, and Complexity Theory},
-  booktitle = {Encyclopedia of Mathematics and its Applications},
-  volume    = {60},
   publisher = {Cambridge University Press},
   year      = {1995},
-  doi       = {10.1017/CBO9780511529948}
+  doi       = {10.1017/CBO9780511529948},
 }
 
 @article{GradelGrohe2019,
@@ -72,8 +57,6 @@
   pages     = {4:1--4:51},
   year      = {2019},
   doi       = {10.23638/LMCS-15(1:4)2019},
-  eprint    = {1802.09377},
-  archivePrefix = {arXiv}
 }
 
 @article{AtseriasOchremiak2019,
@@ -85,8 +68,6 @@
   pages     = {1--31},
   year      = {2019},
   doi       = {10.1145/3285953},
-  eprint    = {1711.07320},
-  archivePrefix = {arXiv}
 }
 
 @article{ChewSlivovsky2024,
@@ -98,8 +79,6 @@
   pages     = {14:1--14:44},
   year      = {2024},
   doi       = {10.46298/lmcs-20(1:14)2024},
-  eprint    = {2210.07085},
-  archivePrefix = {arXiv}
 }
 
 @article{Tzameret2011,
@@ -111,26 +90,22 @@
   pages     = {1269--1292},
   year      = {2011},
   doi       = {10.1016/j.ic.2011.07.004},
-  eprint    = {1004.2159},
-  archivePrefix = {arXiv}
 }
 
 % ----------------------------------------------------------------
 % II.  SAT SOLVING, CDCL, AND PROOF LOGGING
 % ----------------------------------------------------------------
 
-@ARTICLE{Marques-Silva1999,
-  author={Marques-Silva, J.P. and Sakallah, K.A.},
-  journal={IEEE Transactions on Computers}, 
-  title={GRASP: a search algorithm for propositional satisfiability}, 
-  year={1999},
-  volume={48},
-  number={5},
-  pages={506-521},
-  keywords={Algorithm design and analysis;Automatic test pattern generation;Electronic design automation and methodology;Artificial intelligence;Circuit testing;Logic testing;Iterative algorithms;Logic programming;Fault diagnosis},
-  doi={10.1109/12.769433}
+@article{Marques-Silva1999,
+  author    = {J. P. Marques-Silva and K. A. Sakallah},
+  title     = {{GRASP}: A Search Algorithm for Propositional Satisfiability},
+  journal   = {IEEE Transactions on Computers},
+  volume    = {48},
+  number    = {5},
+  pages     = {506--521},
+  year      = {1999},
+  doi       = {10.1109/12.769433},
 }
-
 
 @inproceedings{EenSorensson2003,
   author    = {Niklas E{\'{e}}n and Niklas S\"{o}rensson},
@@ -141,18 +116,19 @@
   pages     = {502--518},
   year      = {2004},
   publisher = {Springer},
-  doi       = {10.1007/978-3-540-24605-3_37}
+  doi       = {10.1007/978-3-540-24605-3_37},
 }
 
-@inproceedings{Biere2009,
-  author    = {Armin Biere},
-  title     = {Picosat Essentials},
-  booktitle = {},
-  journal   = {Journal on Satisfiability, Boolean Modeling and Computation},
-  volume    = {4},
-  pages     = {75--97},
-  year      = {2008},
-  doi       = {10.3233/SAT190039}
+@inproceedings{BiereFallerCAV2024,
+  author    = {Armin Biere and Tobias Faller and Katalin Fazekas and Mathias Fleury and Nils Froleyks and Florian Pollitt},
+  title     = {{CaDiCaL} 2.0},
+  booktitle = {Proceedings of the 36th International Conference on Computer Aided Verification ({CAV}'24)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {14681},
+  pages     = {133--152},
+  year      = {2024},
+  publisher = {Springer},
+  doi       = {10.1007/978-3-031-65627-9_7},
 }
 
 @inproceedings{HeuleHuntMahmoud2017,
@@ -164,47 +140,77 @@
   pages     = {269--284},
   year      = {2017},
   publisher = {Springer},
-  doi       = {10.1007/978-3-319-66107-0_18}
+  doi       = {10.1007/978-3-319-66107-0_18},
 }
 
-@article{GochtNordstrom2022,
+@inproceedings{GochtNordstrom2022,
   author    = {Stephan Gocht and Jakob Nordstr\"{o}m},
   title     = {Certifying Parity Reasoning Efficiently Using Pseudo-Boolean Proofs},
-  journal   = {Proceedings of the AAAI Conference on Artificial Intelligence},
-  volume    = {36},
-  number    = {4},
+  booktitle = {Proceedings of the 36th {AAAI} Conference on Artificial Intelligence},
   pages     = {3764--3771},
   year      = {2022},
   doi       = {10.1609/aaai.v36i4.20291},
-  eprint    = {2209.12185},
-  archivePrefix = {arXiv}
 }
 
+@inproceedings{HeuleKaufmann2023,
+  author    = {Marijn J. H. Heule and Matt Kaufmann and Warren A. Hunt},
+  title     = {Trimming While Checking Clausal Proofs},
+  booktitle = {Proceedings of the 16th International Conference on Formal Methods in Computer-Aided Design ({FMCAD})},
+  pages     = {181--187},
+  year      = {2023},
+  doi       = {10.34727/2023/isbn.978-3-85448-060-0_24},
+}
 
-@article{CouttierRathRawson2025,
-  author  = {Coutelier, Robin and Rath, Jakob and Rawson, Michael and Biere, Armin and Kov{\'a}cs, Laura},
-  title   = {SAT solving for variants of first-order subsumption},
-  journal = {Formal Methods in System Design},
-  year    = {2025},
-  volume  = {67},
-  number  = {1},
-  pages   = {27--70},
-  doi     = {10.1007/s10703-024-00454-1},
-  issn    = {1572-8102},
-  url     = {https://doi.org/10.1007/s10703-024-00454-1}
+@misc{BiereSATCompetition2024,
+  author    = {Armin Biere and Katalin Fazekas and Mathias Fleury and Maximilian Heisinger},
+  title     = {{SAT} Competition 2024: Solver and Benchmark Descriptions},
+  year      = {2024},
+  url       = {https://helda.helsinki.fi/server/api/core/bitstreams/3f1f286b-3def-49e9-98ba-f887b1bc250e/content},
 }
 
 % ----------------------------------------------------------------
-% III.  PROOF ASSISTANTS & INTERACTIVE THEOREM PROVING
+% III.  CERTIFIED PROOF CHECKING / de Bruijn
 % ----------------------------------------------------------------
 
-@inproceedings{CoqDevelopmentTeam2024,
+@inproceedings{LammichLRAT2024,
+  author    = {Mathias Fleury and Peter Lammich},
+  title     = {Fast and Verified {UNSAT} Certificate Checking},
+  booktitle = {Proceedings of the 12th International Joint Conference on Automated Reasoning ({IJCAR}'24)},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {14699},
+  pages     = {417--435},
+  year      = {2024},
+  publisher = {Springer},
+  doi       = {10.1007/978-3-031-63498-7_26},
+}
+
+@article{FleuryVerifiedSAT2025,
+  author    = {Jasmin Blanchette and Sascha B\"{o}hme and Mathias Fleury and Steffen Juilf Smolka and Albert Steckermeier},
+  title     = {A Verified {SAT} Solver Framework with Learn, Forget, Restart and Incrementality},
+  journal   = {Journal of Automated Reasoning},
+  volume    = {68},
+  pages     = {1--44},
+  year      = {2025},
+  doi       = {10.1007/s10817-025-09715-8},
+}
+
+@inproceedings{NordstromProofComplexity2025,
+  author    = {Jakob Nordstr\"{o}m},
+  title     = {Proof Complexity and Its Relations to {SAT} Solving},
+  booktitle = {Proceedings of the 42nd International Symposium on Theoretical Aspects of Computer Science ({STACS}'25)},
+  year      = {2025},
+  note      = {Invited talk},
+}
+
+% ----------------------------------------------------------------
+% IV.  PROOF ASSISTANTS & INTERACTIVE THEOREM PROVING
+% ----------------------------------------------------------------
+
+@misc{CoqDevelopmentTeam2024,
   author    = {{The Coq Development Team}},
   title     = {The {Coq} Proof Assistant, version 8.19},
-  booktitle = {Zenodo},
   year      = {2024},
   doi       = {10.5281/zenodo.10723867},
-  note      = {Software release}
 }
 
 @inproceedings{MouraKong2021,
@@ -216,18 +222,19 @@
   pages     = {625--635},
   year      = {2021},
   publisher = {Springer},
-  doi       = {10.1007/978-3-030-79876-5_37}
+  doi       = {10.1007/978-3-030-79876-5_37},
 }
 
-@inproceedings{NipkowPaulsonWenzel2002,
-  author    = {Tobias Nipkow and Lawrence C. Paulson and Markus Wenzel},
-  title     = {{Isabelle/HOL}: A Proof Assistant for Higher-Order Logic},
-  booktitle = {},
+@article{Harrison2009,
+  author    = {John Harrison},
+  title     = {{HOL Light}: An Overview},
+  journal   = {Proceedings of the 22nd International Conference on Theorem Proving in Higher Order Logics ({TPHOLs}'09)},
   series    = {Lecture Notes in Computer Science},
-  volume    = {2283},
+  volume    = {5674},
+  pages     = {60--66},
+  year      = {2009},
   publisher = {Springer},
-  year      = {2002},
-  doi       = {10.1007/3-540-45949-9}
+  doi       = {10.1007/978-3-642-03359-9_4},
 }
 
 @article{vanDoorn2015,
@@ -237,45 +244,10 @@
   year      = {2015},
   eprint    = {1503.08744},
   archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/1503.08744}
-}
-
-@article{FromVilladsen2020,
-  author    = {Asta Halkj{\ae}r From and J{\o}rgen Villadsen and Patrick Blackburn},
-  title     = {{Isabelle/HOL} as a Meta-Language for Teaching Logic},
-  journal   = {Electronic Proceedings in Theoretical Computer Science},
-  volume    = {328},
-  pages     = {18--34},
-  year      = {2020},
-  doi       = {10.4204/EPTCS.328.2},
-  eprint    = {2010.16014},
-  archivePrefix = {arXiv}
-}
-
-@article{VeltriWan2024,
-  author    = {Niccol\`{o} Veltri and Cheng-Syuan Wan},
-  title     = {Semi-Substructural Logics with Additives},
-  journal   = {Electronic Proceedings in Theoretical Computer Science},
-  volume    = {402},
-  pages     = {63--80},
-  year      = {2024},
-  doi       = {10.4204/EPTCS.402.4},
-  eprint    = {2404.14922},
-  archivePrefix = {arXiv}
-}
-
-@inproceedings{AfeldtBruni2024,
-  author    = {Reynald Affeldt and Alessandro Bruni and Ekaterina Komendantskaya and Natalia {\'S}lusarz and Kathrin Stark},
-  title     = {Taming Differentiable Logics with {Coq} Formalisation},
-  booktitle = {International Conference on Interactive Theorem Proving},
-  year      = {2024},
-  eprint    = {2403.13700},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2403.13700}
 }
 
 % ----------------------------------------------------------------
-% IV.  NEURAL & ML-GUIDED THEOREM PROVING
+% V.  NEURAL & ML-GUIDED THEOREM PROVING
 % ----------------------------------------------------------------
 
 @article{KusumoYahata2018,
@@ -285,7 +257,6 @@
   year      = {2018},
   eprint    = {1811.00796},
   archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/1811.00796}
 }
 
 @article{SekiyamaSuenaga2018,
@@ -295,17 +266,6 @@
   year      = {2018},
   eprint    = {1805.11799},
   archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/1805.11799}
-}
-
-@article{YangPoezia2024,
-  author    = {Kaiyu Yang and Gabriel Poesia and Jia Li and Wenda Li and Swarat Chaudhuri and David Alvarez-Melis and Sara Hooker},
-  title     = {Formal Mathematical Reasoning: A New Frontier in {AI}},
-  journal   = {arXiv preprint},
-  year      = {2024},
-  eprint    = {2412.16075},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2412.16075}
 }
 
 @article{DongMahankali2024,
@@ -315,27 +275,28 @@
   year      = {2024},
   eprint    = {2411.01829},
   archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2411.01829}
 }
 
-@article{SongYangAnandkumar2024,
+@inproceedings{SongYangAnandkumar2024,
   author    = {Peiyang Song and Kaiyu Yang and Anima Anandkumar},
   title     = {Lean Copilot: Large Language Models as Copilots for Theorem Proving in {Lean}},
-  journal   = {arXiv preprint},
-  year      = {2024},
-  eprint    = {2404.12534},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2404.12534}
+  booktitle = {Proceedings of the International Conference on Neuro-symbolic Systems ({NeSy})},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {288},
+  pages     = {144--169},
+  year      = {2025},
+  publisher = {PMLR},
+  url       = {https://proceedings.mlr.press/v288/song25a.html},
 }
 
-@article{DeepSeekProver2024,
+@inproceedings{DeepSeekProver2024,
   author    = {Huajian Xin and Daya Guo and Zhihong Shao and Zhizhou Ren and Qihao Zhu and Bo Liu and Chong Ruan and Wenda Li and Xiaodan Liang},
   title     = {{DeepSeek-Prover}: Advancing Theorem Proving in {LLMs} through Large-Scale Synthetic Data},
-  journal   = {arXiv preprint},
+  booktitle = {Proceedings of the 38th Conference on Neural Information Processing Systems ({NeurIPS})},
   year      = {2024},
+  note      = {MATH-AI Workshop},
   eprint    = {2405.14333},
   archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2405.14333}
 }
 
 @inproceedings{AnLLM2024,
@@ -345,8 +306,6 @@
   pages     = {2947--2961},
   year      = {2024},
   doi       = {10.18653/v1/2024.acl-long.165},
-  eprint    = {2404.07382},
-  archivePrefix = {arXiv}
 }
 
 @article{ZhaoSubgoalXL2024,
@@ -356,21 +315,38 @@
   year      = {2024},
   eprint    = {2408.11172},
   archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2408.11172}
 }
 
-@article{LiSurvey2024,
+@inproceedings{LiSurvey2024,
   author    = {Zhaoyu Li and Jialiang Sun and Logan Murphy and Qinxiang Cao and Xujie Si},
   title     = {A Survey on Deep Learning for Theorem Proving},
-  journal   = {arXiv preprint},
+  booktitle = {Proceedings of the 1st Conference on Language Modeling ({COLM})},
   year      = {2024},
   eprint    = {2404.09939},
   archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2404.09939}
+}
+
+@inproceedings{KumarappanLeanAgent2024,
+  author    = {Adarsh Kumarappan and Mo Tiwari and Anirudh Goyal and Gabriel Poesia and Shashank Srikant and Noah Goodman and Anima Anandkumar},
+  title     = {{LeanAgent}: Lifelong Learning for Formal Theorem Proving},
+  booktitle = {Proceedings of the 38th Conference on Neural Information Processing Systems ({NeurIPS})},
+  year      = {2024},
+  note      = {Poster},
+  eprint    = {2410.06209},
+  archivePrefix = {arXiv},
+}
+
+@article{ZhaoProverAgent2025,
+  author    = {Xueliang Zhao and Jialiang Sun and Wenjie Ma and Zhaoyu Li and Xujie Si},
+  title     = {{ProverAgent}: An {LLM} Agent for Formal Reasoning in Isabelle},
+  journal   = {arXiv preprint},
+  year      = {2025},
+  eprint    = {2405.14332},
+  archivePrefix = {arXiv},
 }
 
 % ----------------------------------------------------------------
-% V.  TABLEAUX, DPLL, AND DECISION PROCEDURES
+% VI.  TABLEAUX, DPLL, AND DECISION PROCEDURES
 % ----------------------------------------------------------------
 
 @article{Davis1962,
@@ -381,7 +357,7 @@
   number    = {7},
   pages     = {394--397},
   year      = {1962},
-  doi       = {10.1145/368273.368557}
+  doi       = {10.1145/368273.368557},
 }
 
 @article{Robinson1965,
@@ -392,31 +368,21 @@
   number    = {1},
   pages     = {23--41},
   year      = {1965},
-  doi       = {10.1145/321250.321253}
+  doi       = {10.1145/321250.321253},
 }
 
-@inbook{Tseitin1968,
+@inproceedings{Tseitin1968,
   author    = {Grigori S. Tseitin},
   title     = {On the Complexity of Derivation in Propositional Calculus},
-  booktitle = {Automation of Reasoning: 2: Classical Papers on Computational Logic 1967--1970},
+  booktitle = {Automation of Reasoning: Classical Papers on Computational Logic 1967--1970},
   pages     = {466--483},
   year      = {1983},
   publisher = {Springer},
-  doi       = {10.1007/978-3-642-81955-1_28}
-}
-
-@article{AravantinusPeltier2011,
-  author    = {Vincent Aravantinos and Nicolas Peltier},
-  title     = {Generating Schemata of Resolution Proofs},
-  journal   = {arXiv preprint},
-  year      = {2011},
-  eprint    = {1106.2692},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/1106.2692}
+  doi       = {10.1007/978-3-642-81955-1_28},
 }
 
 % ----------------------------------------------------------------
-% VI.  PROOF THEORY & TYPE THEORY
+% VII.  PROOF THEORY & TYPE THEORY
 % ----------------------------------------------------------------
 
 @book{Gentzen1969,
@@ -425,15 +391,14 @@
   editor    = {Manfred E. Szabo},
   publisher = {North-Holland},
   year      = {1969},
-  note      = {Original: Untersuchungen \"{u}ber das logische Schlie{\ss}en, 1935}
+  note      = {Original: Untersuchungen \"{u}ber das logische Schlie{\ss}en, 1935},
 }
 
 @book{Prawitz1965,
   author    = {Dag Prawitz},
   title     = {Natural Deduction: A Proof-Theoretical Study},
-  publisher = {Almqvist and Wiksell},
+  publisher = {Almqvist \& Wiksell},
   year      = {1965},
-  note      = {Reprinted by Dover, 2006}
 }
 
 @book{TroelstraSchwichtenberg2000,
@@ -442,21 +407,11 @@
   edition   = {2nd},
   publisher = {Cambridge University Press},
   year      = {2000},
-  doi       = {10.1017/CBO9781139168717}
-}
-
-@inproceedings{Howard1980,
-  author    = {William A. Howard},
-  title     = {The Formulae-as-Types Notion of Construction},
-  booktitle = {To H. B. Curry: Essays on Combinatory Logic, Lambda Calculus and Formalism},
-  pages     = {479--490},
-  year      = {1980},
-  publisher = {Academic Press},
-  note      = {Original manuscript 1969}
+  doi       = {10.1017/CBO9781139168717},
 }
 
 % ----------------------------------------------------------------
-% VII.  COMPLEXITY THEORY & LOWER BOUNDS
+% VIII.  COMPLEXITY THEORY & LOWER BOUNDS
 % ----------------------------------------------------------------
 
 @article{BenSasson2002,
@@ -467,7 +422,7 @@
   number    = {3-4},
   pages     = {209--218},
   year      = {2002},
-  doi       = {10.1007/s00037-002-0169-0}
+  doi       = {10.1007/s00037-002-0169-0},
 }
 
 @article{Pitassi1998,
@@ -478,100 +433,11 @@
   number    = {2},
   pages     = {97--140},
   year      = {1993},
-  doi       = {10.1007/BF01200117}
+  doi       = {10.1007/BF01200117},
 }
 
 % ----------------------------------------------------------------
-% VIII.  BENCHMARKS & EVALUATION
-% ----------------------------------------------------------------
-
-@inproceedings{Hoos2000,
-  author    = {Holger H. Hoos and Thomas St\"{u}tzle},
-  title     = {{SATLIB}: An Online Resource for Research on {SAT}},
-  booktitle = {{SAT} 2000},
-  pages     = {283--292},
-  year      = {2000},
-  publisher = {IOS Press},
-  url       = {http://www.satlib.org}
-}
-
-@inproceedings{MouraUllrich2021LICS,
-  author    = {Leonardo de Moura and Sebastian Ullrich},
-  title     = {{Lean}: A {SAT}-Based Model Checker},
-  booktitle = {Proceedings of the 36th Annual ACM/IEEE Symposium on Logic in Computer Science ({LICS})},
-  year      = {2021},
-  publisher = {IEEE},
-  doi       = {10.1109/LICS52264.2021.9470620}
-}
-
-@inproceedings{AvigadMassot2021,
-  author    = {Jeremy Avigad and Patrick Massot},
-  title     = {Mathematics in {Lean}},
-  booktitle = {Proceedings of the 36th Annual ACM/IEEE Symposium on Logic in Computer Science ({LICS})},
-  year      = {2021},
-  publisher = {IEEE},
-  doi       = {10.1109/LICS52264.2021.9470590}
-}
-
-% ----------------------------------------------------------------
-% IX.  RELATED SYSTEMS & TOOLS
-% ----------------------------------------------------------------
-
-@article{Harrison2009,
-  author    = {John Harrison},
-  title     = {{HOL Light}: An Overview},
-  booktitle = {Proceedings of the 22nd International Conference on Theorem Proving in Higher Order Logics ({TPHOLs}'09)},
-  series    = {Lecture Notes in Computer Science},
-  volume    = {5674},
-  pages     = {60--66},
-  year      = {2009},
-  publisher = {Springer},
-  doi       = {10.1007/978-3-642-03359-9_4}
-}
-
-@article{Schreiner2018,
-  author    = {Wolfgang Schreiner and Alexander Brunhuemer and Christoph F\"{u}rst},
-  title     = {Teaching the Formalization of Mathematical Theories and Algorithms via the Automatic Checking of Finite Models},
-  journal   = {Electronic Proceedings in Theoretical Computer Science},
-  volume    = {267},
-  pages     = {120--139},
-  year      = {2018},
-  doi       = {10.4204/EPTCS.267.8},
-  eprint    = {1803.01472},
-  archivePrefix = {arXiv}
-}
-
-@inproceedings{Tian2017,
-  author    = {Chun Tian},
-  title     = {Formalized {Lambek} Calculus in Higher Order Logic ({HOL4})},
-  journal   = {arXiv preprint},
-  year      = {2017},
-  eprint    = {1705.07318},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/1705.07318}
-}
-
-@inproceedings{KumarappanLeanAgent2024,
-  author    = {Adarsh Kumarappan and Mo Tiwari and Anirudh Goyal and Gabriel Poesia and Shashank Srikant and Noah Goodman and Anima Anandkumar},
-  title     = {{LeanAgent}: Lifelong Learning for Formal Theorem Proving},
-  journal   = {arXiv preprint},
-  year      = {2024},
-  eprint    = {2410.06209},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2410.06209}
-}
-
-@inproceedings{HeuleKaufmann2023,
-  author    = {Marijn J. H. Heule and Matt Kaufmann and Warren A. Hunt},
-  title     = {Trimming While Checking Clausal Proofs},
-  booktitle = {Proceedings of the 16th International Conference on Formal Methods in Computer-Aided Design ({FMCAD})},
-  pages     = {181--187},
-  year      = {2023},
-  doi       = {10.34727/2023/isbn.978-3-85448-060-0_24}
-}
-
-% ----------------------------------------------------------------
-% X.  2025--2026 RECENT WORK (added for LICS/CAV 2027 submission)
+% IX.  2025--2026 RECENT WORK
 % ----------------------------------------------------------------
 
 @article{AlphaProof2025,
@@ -582,7 +448,16 @@
   pages     = {607--613},
   year      = {2025},
   doi       = {10.1038/s41586-025-09833-y},
-  publisher = {Springer Nature}
+}
+
+@inproceedings{DreamProver2026,
+  author    = {Youyuan Zhang and Jialiang Sun and Hangrui Bi and Chuqin Geng and Wenjie Ma and Zhaoyu Li and Xujie Si},
+  title     = {{DreamProver}: Evolving Transferable Lemma Libraries via a Wake-Sleep Theorem-Proving Agent},
+  booktitle = {Proceedings of the 39th Conference on Neural Information Processing Systems ({NeurIPS})},
+  year      = {2026},
+  note      = {To appear},
+  eprint    = {2604.26311},
+  archivePrefix = {arXiv},
 }
 
 @article{DeepSeekProverV2,
@@ -592,105 +467,16 @@
   year      = {2025},
   eprint    = {2504.21801},
   archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2504.21801}
-}
-
-@article{DreamProver2026,
-  author    = {Youyuan Zhang and Jialiang Sun and Hangrui Bi and Chuqin Geng and Wenjie Ma and Zhaoyu Li and Xujie Si},
-  title     = {{DreamProver}: Evolving Transferable Lemma Libraries via a Wake-Sleep Theorem-Proving Agent},
-  journal   = {arXiv preprint},
-  year      = {2026},
-  eprint    = {2604.26311},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2604.26311}
-}
-
-@inproceedings{LammichLRAT2024,
-  author    = {Mathias Fleury and Peter Lammich},
-  title     = {Fast and Verified {UNSAT} Certificate Checking},
-  booktitle = {Proceedings of the 12th International Joint Conference on Automated Reasoning ({IJCAR}'24)},
-  series    = {Lecture Notes in Computer Science},
-  volume    = {14699},
-  pages     = {417--435},
-  year      = {2024},
-  publisher = {Springer},
-  doi       = {10.1007/978-3-031-63498-7_26}
-}
-
-@article{FleuryVerifiedSAT2025,
-  author    = {Jasmin Blanchette and Sascha B\"{o}hme and Mathias Fleury and Steffen Juilf Smolka and Albert Steckermeier},
-  title     = {A Verified {SAT} Solver Framework with Learn, Forget, Restart and Incrementality},
-  journal   = {Journal of Automated Reasoning},
-  volume    = {68},
-  pages     = {1--44},
-  year      = {2025},
-  doi       = {10.1007/s10817-025-09715-8}
-}
-
-@article{NordstromProofComplexity2025,
-  author    = {Jakob Nordstr\"{o}m},
-  title     = {Proof Complexity and Its Relations to {SAT} Solving},
-  booktitle = {Proceedings of the 42nd International Symposium on Theoretical Aspects of Computer Science ({STACS}'25)},
-  year      = {2025},
-  url       = {https://stacs2025.gitlab.io/pdf/Albert-invited.pdf},
-  note      = {Invited talk}
-}
-
-@article{FirstProofNet2025,
-  author    = {Minguk Kang and Edward Ayers and Kaghan Goksel and Wenda Li and Xiaodan Liang and Yuhuai Wu and Zhengying Liu},
-  title     = {Large Language Models Can Self-Correct for {SAT} Solving},
-  journal   = {arXiv preprint},
-  year      = {2025},
-  eprint    = {2501.08441},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2501.08441}
-}
-
-@article{ZhaoProverAgent2025,
-  author    = {Xueliang Zhao and Jialiang Sun and Wenjie Ma and Zhaoyu Li and Xujie Si},
-  title     = {{ProverAgent}: An {LLM} Agent for Formal Reasoning in Isabelle},
-  journal   = {arXiv preprint},
-  year      = {2025},
-  eprint    = {2405.14332},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2405.14332}
-}
-
-@article{ChenProofGeneralization2025,
-  author    = {Mark Chen and Jerry Li and Edward Chen and Percy Liang and Ion Stoica and Ce Zhang and Matei Zaharia},
-  title     = {Formal Mathematics Statement Curriculum Learning},
-  journal   = {arXiv preprint},
-  year      = {2025},
-  eprint    = {2406.08121},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2406.08121}
-}
-
-@article{BiereSATCompetition2024,
-  author    = {Armin Biere and Katalin Fazekas and Mathias Fleury and Maximilian Heisinger},
-  title     = {{SAT} Competition 2024: Solver and Benchmark Descriptions},
-  year      = {2024},
-  url       = {https://helda.helsinki.fi/server/api/core/bitstreams/3f1f286b-3def-49e9-98ba-f887b1bc250e/content}
-}
-
-@article{TzameretIPS2024,
-  author    = {Iddo Tzameret and Stephen A. Cook},
-  title     = {Uniform Automatizability and Related Properties},
-  journal   = {arXiv preprint},
-  year      = {2024},
-  eprint    = {2311.00560},
-  archivePrefix = {arXiv},
-  url       = {https://arxiv.org/abs/2311.00560}
 }
 
 % ----------------------------------------------------------------
-% XI. PHASE TRANSITION REFERENCES
+% X.  PHASE TRANSITION REFERENCES
 % ----------------------------------------------------------------
 
-@article{Cheeseman1986,
+@inproceedings{Cheeseman1986,
   author    = {Peter Cheeseman and Bob Kanefsky and William M. Taylor},
   title     = {Where the Really Hard Problems Are},
-  journal   = {Proceedings of the 12th International Joint Conference on Artificial Intelligence ({IJCAI}'91)},
+  booktitle = {Proceedings of the 12th International Joint Conference on Artificial Intelligence ({IJCAI}'91)},
   pages     = {331--337},
   year      = {1991},
   publisher = {Morgan Kaufmann},

@@ -40,8 +40,7 @@ J.~A. Robinson, ``A machine-oriented logic based on the resolution principle,''
   \emph{Journal of the ACM}, vol.~12, no.~1, pp. 23--41, 1965.
 
 \bibitem{CoqDevelopmentTeam2024}
-{The Coq Development Team}, ``The {Coq} proof assistant, version 8.19,'' in
-  \emph{Zenodo}, 2024, software release.
+{The Coq Development Team}, ``The {Coq} proof assistant, version 8.19,'' 2024.
 
 \bibitem{MouraKong2021}
 L.~de~Moura and S.~Ullrich, ``The {Lean~4} theorem prover and programming
@@ -51,7 +50,9 @@ L.~de~Moura and S.~Ullrich, ``The {Lean~4} theorem prover and programming
   625--635.
 
 \bibitem{Harrison2009}
-J.~Harrison, ``{HOL Light}: An overview,'' vol. 5674, pp. 60--66, 2009.
+J.~Harrison, ``{HOL Light}: An overview,'' \emph{Proceedings of the 22nd
+  International Conference on Theorem Proving in Higher Order Logics
+  ({TPHOLs}'09)}, vol. 5674, pp. 60--66, 2009.
 
 \bibitem{HeuleHuntMahmoud2017}
 M.~J.~H. Heule, W.~A. {Hunt Jr.}, M.~Kaufmann, and N.~Wetzler, ``Efficient,
@@ -61,9 +62,9 @@ M.~J.~H. Heule, W.~A. {Hunt Jr.}, M.~Kaufmann, and N.~Wetzler, ``Efficient,
   0.4em\relax Springer, 2017, pp. 269--284.
 
 \bibitem{Marques-Silva1999}
-J.~Marques-Silva and K.~Sakallah, ``Grasp: a search algorithm for propositional
-  satisfiability,'' \emph{IEEE Transactions on Computers}, vol.~48, no.~5, pp.
-  506--521, 1999.
+J.~P. Marques-Silva and K.~A. Sakallah, ``{GRASP}: A search algorithm for
+  propositional satisfiability,'' \emph{IEEE Transactions on Computers},
+  vol.~48, no.~5, pp. 506--521, 1999.
 
 \bibitem{EenSorensson2003}
 N.~E{\'{e}}n and N.~S\"{o}rensson, ``An extensible {SAT}-solver,'' in
@@ -73,32 +74,29 @@ N.~E{\'{e}}n and N.~S\"{o}rensson, ``An extensible {SAT}-solver,'' in
   2004, pp. 502--518.
 
 \bibitem{Krajicek1995}
-J.~Kraj\'{\i}\v{c}ek, ``Bounded arithmetic, propositional logic, and complexity
-  theory,'' in \emph{Encyclopedia of Mathematics and its Applications},
-  vol.~60.\hskip 1em plus 0.5em minus 0.4em\relax Cambridge University Press,
-  1995.
+J.~Kraj\'{\i}\v{c}ek, \emph{Bounded Arithmetic, Propositional Logic, and
+  Complexity Theory}.\hskip 1em plus 0.5em minus 0.4em\relax Cambridge
+  University Press, 1995.
 
 \bibitem{KusumoYahata2018}
-\BIBentryALTinterwordspacing
 M.~Kusumoto, K.~Yahata, and M.~Sakai, ``Automated theorem proving in
   intuitionistic propositional logic by deep reinforcement learning,''
-  \emph{arXiv preprint}, 2018. [Online]. Available:
-  \url{https://arxiv.org/abs/1811.00796}
-\BIBentrySTDinterwordspacing
+  \emph{arXiv preprint}, 2018.
 
 \bibitem{DeepSeekProver2024}
-\BIBentryALTinterwordspacing
 H.~Xin, D.~Guo, Z.~Shao, Z.~Ren, Q.~Zhu, B.~Liu, C.~Ruan, W.~Li, and X.~Liang,
   ``{DeepSeek-Prover}: Advancing theorem proving in {LLMs} through large-scale
-  synthetic data,'' \emph{arXiv preprint}, 2024. [Online]. Available:
-  \url{https://arxiv.org/abs/2405.14333}
-\BIBentrySTDinterwordspacing
+  synthetic data,'' in \emph{Proceedings of the 38th Conference on Neural
+  Information Processing Systems ({NeurIPS})}, 2024, mATH-AI Workshop.
 
 \bibitem{SongYangAnandkumar2024}
 \BIBentryALTinterwordspacing
 P.~Song, K.~Yang, and A.~Anandkumar, ``Lean copilot: Large language models as
-  copilots for theorem proving in {Lean},'' \emph{arXiv preprint}, 2024.
-  [Online]. Available: \url{https://arxiv.org/abs/2404.12534}
+  copilots for theorem proving in {Lean},'' in \emph{Proceedings of the
+  International Conference on Neuro-symbolic Systems ({NeSy})}, ser.
+  Proceedings of Machine Learning Research, vol. 288.\hskip 1em plus 0.5em
+  minus 0.4em\relax PMLR, 2025, pp. 144--169. [Online]. Available:
+  \url{https://proceedings.mlr.press/v288/song25a.html}
 \BIBentrySTDinterwordspacing
 
 \bibitem{AlphaProof2025}
@@ -107,12 +105,10 @@ T.~Hubert, R.~Mehta, L.~Sartran \emph{et~al.}, ``Olympiad-level formal
   651, pp. 607--613, 2025.
 
 \bibitem{DeepSeekProverV2}
-\BIBentryALTinterwordspacing
 H.~Xin, D.~Guo, Z.~Shao, Z.~Ren, Q.~Zhu, B.~Liu, C.~Ruan, W.~Li, and X.~Liang,
   ``{DeepSeek-Prover-V2}: Advancing formal mathematical reasoning via
   reinforcement learning and recursive subgoal decomposition,'' \emph{arXiv
-  preprint}, 2025. [Online]. Available: \url{https://arxiv.org/abs/2504.21801}
-\BIBentrySTDinterwordspacing
+  preprint}, 2025.
 
 \bibitem{Tzameret2011}
 I.~Tzameret, ``Algebraic proofs over noncommutative formulas,''
@@ -123,11 +119,9 @@ A.~Atserias and J.~Ochremiak, ``Proof complexity meets algebra,'' \emph{ACM
   Transactions on Computational Logic}, vol.~20, no.~1, pp. 1--31, 2019.
 
 \bibitem{NordstromProofComplexity2025}
-\BIBentryALTinterwordspacing
-J.~Nordstr\"{o}m, ``Proof complexity and its relations to {SAT} solving,''
-  2025, invited talk. [Online]. Available:
-  \url{https://stacs2025.gitlab.io/pdf/Albert-invited.pdf}
-\BIBentrySTDinterwordspacing
+J.~Nordstr\"{o}m, ``Proof complexity and its relations to {SAT} solving,'' in
+  \emph{Proceedings of the 42nd International Symposium on Theoretical Aspects
+  of Computer Science ({STACS}'25)}, 2025, invited talk.
 
 \bibitem{GradelGrohe2019}
 E.~Gr\"{a}del, M.~Grohe, B.~Pago, and W.~Pakusa, ``A finite-model-theoretic
@@ -135,16 +129,13 @@ E.~Gr\"{a}del, M.~Grohe, B.~Pago, and W.~Pakusa, ``A finite-model-theoretic
   Science}, vol.~15, no.~1, pp. 4:1--4:51, 2019.
 
 \bibitem{Beame1998}
-\BIBentryALTinterwordspacing
 P.~Beame and T.~Pitassi, ``Propositional proof complexity: Past, present, and
-  future,'' \emph{Bulletin of the EATCS}, vol.~65, pp. 66--89, 1998. [Online].
-  Available: \url{https://eccc.weizmann.ac.il/report/1998/067/}
-\BIBentrySTDinterwordspacing
+  future,'' \emph{Bulletin of the EATCS}, vol.~65, pp. 66--89, 1998.
 
 \bibitem{GochtNordstrom2022}
 S.~Gocht and J.~Nordstr\"{o}m, ``Certifying parity reasoning efficiently using
-  pseudo-boolean proofs,'' \emph{Proceedings of the AAAI Conference on
-  Artificial Intelligence}, vol.~36, no.~4, pp. 3764--3771, 2022.
+  pseudo-boolean proofs,'' in \emph{Proceedings of the 36th {AAAI} Conference
+  on Artificial Intelligence}, 2022, pp. 3764--3771.
 
 \bibitem{LammichLRAT2024}
 M.~Fleury and P.~Lammich, ``Fast and verified {UNSAT} certificate checking,''
@@ -164,10 +155,7 @@ J.~Blanchette, S.~B\"{o}hme, M.~Fleury, S.~J. Smolka, and A.~Steckermeier, ``A
   2025.
 
 \bibitem{vanDoorn2015}
-\BIBentryALTinterwordspacing
 F.~van Doorn, ``Propositional calculus in {Coq},'' \emph{arXiv preprint}, 2015.
-  [Online]. Available: \url{https://arxiv.org/abs/1503.08744}
-\BIBentrySTDinterwordspacing
 
 \bibitem{ChewSlivovsky2024}
 L.~Chew and F.~Slivovsky, ``Towards uniform certification in {QBF},''
@@ -175,18 +163,13 @@ L.~Chew and F.~Slivovsky, ``Towards uniform certification in {QBF},''
   2024.
 
 \bibitem{SekiyamaSuenaga2018}
-\BIBentryALTinterwordspacing
 T.~Sekiyama and K.~Suenaga, ``Automated proof synthesis for propositional logic
-  with deep neural networks,'' \emph{arXiv preprint}, 2018. [Online].
-  Available: \url{https://arxiv.org/abs/1805.11799}
-\BIBentrySTDinterwordspacing
+  with deep neural networks,'' \emph{arXiv preprint}, 2018.
 
 \bibitem{LiSurvey2024}
-\BIBentryALTinterwordspacing
 Z.~Li, J.~Sun, L.~Murphy, Q.~Cao, and X.~Si, ``A survey on deep learning for
-  theorem proving,'' \emph{arXiv preprint}, 2024. [Online]. Available:
-  \url{https://arxiv.org/abs/2404.09939}
-\BIBentrySTDinterwordspacing
+  theorem proving,'' in \emph{Proceedings of the 1st Conference on Language
+  Modeling ({COLM})}, 2024.
 
 \bibitem{AnLLM2024}
 C.~An, Z.~Liu, J.~Li, Y.~Shen, H.~Xin, P.~Liu, and H.~Li, ``Learn from failure:
@@ -195,44 +178,38 @@ C.~An, Z.~Liu, J.~Li, Y.~Shen, H.~Xin, P.~Liu, and H.~Li, ``Learn from failure:
   Association for Computational Linguistics ({ACL})}, 2024, pp. 2947--2961.
 
 \bibitem{ZhaoSubgoalXL2024}
-\BIBentryALTinterwordspacing
 X.~Zhao, L.~Zheng, H.~Bo, C.~Hu, U.~Thakker, and L.~Kong, ``{SubgoalXL}:
   Subgoal-based expert learning for theorem proving,'' \emph{arXiv preprint},
-  2024. [Online]. Available: \url{https://arxiv.org/abs/2408.11172}
-\BIBentrySTDinterwordspacing
+  2024.
 
 \bibitem{DongMahankali2024}
-\BIBentryALTinterwordspacing
 K.~Dong, A.~Mahankali, and T.~Ma, ``Formal theorem proving by rewarding {LLMs}
-  to decompose proofs hierarchically,'' \emph{arXiv preprint}, 2024. [Online].
-  Available: \url{https://arxiv.org/abs/2411.01829}
-\BIBentrySTDinterwordspacing
+  to decompose proofs hierarchically,'' \emph{arXiv preprint}, 2024.
 
 \bibitem{KumarappanLeanAgent2024}
-\BIBentryALTinterwordspacing
 A.~Kumarappan, M.~Tiwari, A.~Goyal, G.~Poesia, S.~Srikant, N.~Goodman, and
   A.~Anandkumar, ``{LeanAgent}: Lifelong learning for formal theorem proving,''
-  2024. [Online]. Available: \url{https://arxiv.org/abs/2410.06209}
-\BIBentrySTDinterwordspacing
+  in \emph{Proceedings of the 38th Conference on Neural Information Processing
+  Systems ({NeurIPS})}, 2024, poster.
 
 \bibitem{ZhaoProverAgent2025}
-\BIBentryALTinterwordspacing
 X.~Zhao, J.~Sun, W.~Ma, Z.~Li, and X.~Si, ``{ProverAgent}: An {LLM} agent for
-  formal reasoning in isabelle,'' \emph{arXiv preprint}, 2025. [Online].
-  Available: \url{https://arxiv.org/abs/2405.14332}
-\BIBentrySTDinterwordspacing
+  formal reasoning in isabelle,'' \emph{arXiv preprint}, 2025.
 
 \bibitem{DreamProver2026}
-\BIBentryALTinterwordspacing
 Y.~Zhang, J.~Sun, H.~Bi, C.~Geng, W.~Ma, Z.~Li, and X.~Si, ``{DreamProver}:
   Evolving transferable lemma libraries via a wake-sleep theorem-proving
-  agent,'' \emph{arXiv preprint}, 2026. [Online]. Available:
-  \url{https://arxiv.org/abs/2604.26311}
-\BIBentrySTDinterwordspacing
+  agent,'' in \emph{Proceedings of the 39th Conference on Neural Information
+  Processing Systems ({NeurIPS})}, 2026, to appear.
 
 \bibitem{Prawitz1965}
 D.~Prawitz, \emph{Natural Deduction: A Proof-Theoretical Study}.\hskip 1em plus
-  0.5em minus 0.4em\relax Almqvist and Wiksell, 1965, reprinted by Dover, 2006.
+  0.5em minus 0.4em\relax Almqvist \& Wiksell, 1965.
+
+\bibitem{Gentzen1969}
+G.~Gentzen, \emph{The Collected Papers of {G}erhard {G}entzen}, M.~E. Szabo,
+  Ed.\hskip 1em plus 0.5em minus 0.4em\relax North-Holland, 1969, original:
+  Untersuchungen \"{u}ber das logische Schlie{\ss}en, 1935.
 
 \bibitem{TroelstraSchwichtenberg2000}
 A.~S. Troelstra and H.~Schwichtenberg, \emph{Basic Proof Theory}, 2nd~ed.\hskip
@@ -252,8 +229,9 @@ A.~Biere, K.~Fazekas, M.~Fleury, and M.~Heisinger, ``{SAT} competition 2024:
 
 \bibitem{Cheeseman1986}
 P.~Cheeseman, B.~Kanefsky, and W.~M. Taylor, ``Where the really hard problems
-  are,'' \emph{Proceedings of the 12th International Joint Conference on
-  Artificial Intelligence ({IJCAI}'91)}, pp. 331--337, 1991.
+  are,'' in \emph{Proceedings of the 12th International Joint Conference on
+  Artificial Intelligence ({IJCAI}'91)}.\hskip 1em plus 0.5em minus 0.4em\relax
+  Morgan Kaufmann, 1991, pp. 331--337.
 
 \bibitem{Kirkpatrick1994}
 S.~Kirkpatrick and B.~Selman, ``Critical behavior in the satisfiability of

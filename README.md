@@ -6,19 +6,60 @@ NeuroProof is a hybrid propositional proof system that combines natural deductio
 
 ## Key Features
 
-- **Hybrid proof calculus**: Natural deduction + sequent calculus + resolution rules
+- **Hybrid proof calculus**: Natural deduction + sequent calculus + resolution rules, p-simulating Frege
 - **Novel rules**: ADAPTIVE_CUT (learned cut formula selection), LEMMA_REUSE (proof DAG edge reuse), INTERPOLANT (Craig interpolation via CDCL)
 - **ATSS**: Online tactic synthesis with zero pre-training (EMA updates, cosine similarity ranking)
 - **GNN ATSS**: Optional graph neural network for structure-aware tactic selection (GIN encoder, GPU-accelerated)
-- **Certified checking**: Dual implementation/Rocq verification chain following the de Bruijn criterion
-- **DAG proof compression**: Proof size reduction of s - Omega(log s)
+- **Certified checking**: Dual implementation/Coq verification chain following the de Bruijn criterion
+- **DAG proof compression**: Proof size reduction via LEMMA_REUSE
 - **CDCL solver**: Full CDCL with 1-UIP conflict analysis, VSIDS, Luby restarts, clause deletion, phase saving
+- **Mechanically verified**: Soundness and completeness formally proven in Rocq/Coq 8.19
+
+## Quick Start
+
+### 1. Verify Installation
+
+```bash
+cd NeuroProof
+python verify_installation.py
+```
+
+### 2. Run Experiments
+
+```bash
+# EXP-4: Classical tautology proofs (fastest, ~1 second)
+python experiments/benchmark_suite.py --exp 4
+
+# EXP-2: Pigeonhole Principle (~2 minutes)
+python experiments/benchmark_suite.py --exp 2
+
+# Run all 8 experiments
+python experiments/benchmark_suite.py --exp all
+```
+
+Results are saved to `experiments/results.csv`.
+
+See [EXPERIMENTS.md](EXPERIMENTS.md) for detailed documentation.
+
+### 3. Generate Plots (optional)
+
+```bash
+pip install matplotlib numpy pandas
+python experiments/plot_results.py
+```
+
+### 4. Rocq Formal Verification (optional)
+
+```bash
+cd coq
+coqc NeuroProof.v
+```
 
 ## Project Structure
 
 ```
 NeuroProof/
-├── src/                          # Core library (pure Python, no dependencies)
+├── src/                          # Core library (pure Python)
 │   ├── __init__.py               # Public API exports
 │   ├── formula.py                # Formula AST, parser, NNF/CNF transformations
 │   ├── proof.py                  # Proof steps, ProofBuilder, Rule enum
@@ -28,26 +69,27 @@ NeuroProof/
 │   ├── tseitin.py                # Tseitin linear-size CNF encoding
 │   └── atss_gnn.py               # GNN-based tactic selection (optional, GPU)
 ├── experiments/
-│   ├── __init__.py
-│   ├── benchmark_suite.py        # Full benchmark suite (9 experiments)
+│   ├── benchmark_suite.py        # Full benchmark suite (8 experiments)
 │   ├── plot_results.py           # Publication-quality plot generation
 │   ├── results.csv               # Experiment output data
-│   └── figures/                  # Generated plots (PDF)
+│   └── figures/                  # Generated plots (PDF/PNG)
 ├── scripts/
+│   ├── run_all_experiments.py
 │   ├── run_exp1_phase_transition.py
 │   ├── run_exp2_pigeonhole.py
 │   ├── run_exp3_tseitin.py
 │   ├── run_exp4_tautologies.py
-│   ├── run_exp5_atss_learning.py
-│   └── run_all_experiments.py
+│   └── run_exp5_atss_learning.py
 ├── coq/
 │   └── NeuroProof.v              # Rocq/Coq formalisation (soundness + completeness)
 ├── paper/
-│   ├── neuroproof.tex            # LICS/CAV formatted paper
-│   └── references.bib            # Bibliography
+│   ├── neuroproof.tex            # LICS/CAV formatted paper (IEEEtran)
+│   ├── references.bib            # Bibliography
+│   ├── IEEEtran.cls              # IEEE style
+│   └── IEEEbib.bst               # IEEE bibliography style
 ├── verify_installation.py        # Quick smoke test (no dependencies)
-├── EXPERIMENTS.md                # Detailed experiment reproduction guide
 ├── requirements.txt              # Python dependencies
+├── EXPERIMENTS.md                # Detailed experiment reproduction guide
 ├── LICENSE                       # MIT License
 └── README.md
 ```
@@ -60,67 +102,20 @@ NeuroProof/
 - **Optional**: `torch`, `torch_geometric` for GNN ATSS (GPU recommended)
 - **Optional**: Rocq/Coq 8.19+ for formal verification
 
-## Quick Start
+## Experiments
 
-### 1. Verify Installation
+| # | Name | Description | Est. Time |
+|---|------|-------------|-----------|
+| 1 | Phase Transition | Random 3-CNF, ratio 2.0-6.0 (n=50, 50 trials) | ~5-15 min |
+| 2 | Pigeonhole | PHP_n (n=2..6), hard UNSAT instances | ~2 min |
+| 3 | Tseitin | Graph-based Tseitin tautologies | ~2 min |
+| 4 | Proof Quality | 15 classical tautologies, ATSS vs. noATSS | ~1 sec |
+| 5 | Ablation | CDCL vs ATSS contribution analysis | ~5 min |
+| 6 | Scalability | n_vars sweep at phase transition ratio 4.3 | ~5 min |
+| 7 | SOTA Comparison | PHP + 3-CNF vs baselines (Glucose4, DPLL) | ~3 min |
+| 8 | GNN ATSS | GNN vs cosine tactic selection | ~2 min (GPU) |
 
-```bash
-cd NeuroProof
-python verify_installation.py
-```
-
-Expected output: `All tests passed! NeuroProof is correctly installed.` (under 10s, no dependencies needed)
-
-### 2. Run Experiments
-
-Run individual experiments:
-
-```bash
-# EXP-4: Classical tautology proofs (fastest, ~1 second)
-python experiments/benchmark_suite.py --exp 4
-
-# EXP-2: Pigeonhole Principle (~2 minutes)
-python experiments/benchmark_suite.py --exp 2
-
-# EXP-5: ATSS online learning (~30 seconds)
-python experiments/benchmark_suite.py --exp 5
-
-# Run multiple experiments
-python experiments/benchmark_suite.py --exp 2,4,5
-```
-
-Run all experiments:
-
-```bash
-python experiments/benchmark_suite.py --exp all
-```
-
-Results are saved to `experiments/results.csv`.
-
-See [EXPERIMENTS.md](EXPERIMENTS.md) for detailed documentation of all 9 experiments.
-
-### 3. Generate Plots (optional)
-
-```bash
-pip install matplotlib numpy pandas
-python experiments/plot_results.py
-```
-
-Plots are saved to `experiments/figures/`.
-
-### 4. Rocq Formal Verification (optional)
-
-```bash
-cd coq
-coqc NeuroProof.v
-```
-
-The formalisation provides:
-- 17 natural deduction rules as certified lemmas
-- **Soundness theorem**: derivability implies semantic validity (fully proven, all 7 connectives)
-- **Completeness theorem**: semantic validity implies derivability (proven via eval-interp bridge lemma)
-- **ADAPTIVE_CUT soundness**: the novel cut rule preserves validity
-- Craig interpolation existence (stated as axiom; constructive proof via Pudlak's algorithm in the CDCL solver)
+See [EXPERIMENTS.md](EXPERIMENTS.md) for full reproduction instructions.
 
 ## Public API
 
@@ -156,9 +151,10 @@ The verification kernel is intentionally minimal: each proof step is verified by
 
 ### ATSS (Adaptive Tactic Synthesis System)
 
-- Maintains a tactic embedding table: formula hash -> (success_count, attempt_count)
-- Updates via exponential moving average (decay=0.95)
+- Maintains a tactic embedding table: formula hash → (success_count, attempt_count)
+- Updates via exponential moving average (γ=0.95)
 - Cut formula selection by maximizing cosine similarity (sparse bag-of-subformulas)
+- Sample complexity N = O(ε⁻²log(k/δ))
 - Learns online during proof search, no pre-training required
 
 ### GNN ATSS (optional)
@@ -173,55 +169,41 @@ The verification kernel is intentionally minimal: each proof step is verified by
 - Standard CDCL with 1-UIP conflict analysis and clause learning
 - ATSS-enriched VSIDS heuristic for variable selection
 - Luby restart sequence, phase saving, clause deletion
-- Craig interpolant extraction via Pudlak's algorithm
+- Craig interpolant extraction via Pudlák's algorithm
 - Proof logging via `ProofStep` DAG construction
 
 ### Craig Interpolation
 
-Pudlak's resolution-based interpolation algorithm: given a resolution refutation of A ∧ B, each clause is annotated with its origin (A-local, B-local, or shared). The interpolant is extracted as a single pass over the resolution proof DAG, with propagation rules ensuring the interpolant sits in the common language of A and B. Extracted interpolants are stored in the ATSS lemma table for future LEMMA_REUSE applications.
+Pudlák's resolution-based interpolation algorithm: given a resolution refutation of A ∧ B, each clause is annotated with its origin (A-local, B-local, or shared). The interpolant is extracted as a single pass over the resolution proof DAG, with propagation rules (shared → OR, local → AND) ensuring the interpolant sits in the common language of A and B. Extracted interpolants are stored in the ATSS lemma table for future LEMMA_REUSE applications.
 
-## Experiments
+## Key Results
 
-| # | Name | Description | Est. Time |
-|---|------|-------------|----------|
-| 1 | Phase Transition | Random 3-CNF, ratio 2.0-6.0 | ~5-15 min |
-| 2 | Pigeonhole | PHP_n (n=2..6), hard UNSAT | ~2 min |
-| 3 | Tseitin | Graph-based Tseitin tautologies | ~2 min |
-| 4 | Proof Quality | 15 classical tautologies | ~1 sec |
-| 5 | ATSS Learning | Online learning convergence | ~30 sec |
-| 6 | Ablation | CDCL vs ATSS contribution | ~5 min |
-| 7 | Scalability | n_vars sweep at phase transition | ~5 min |
-| 8 | SOTA Comparison | PHP + 3-CNF vs baselines | ~3 min |
-| 9 | GNN ATSS | GNN vs cosine tactic selection | ~2 min (GPU) |
-
-See [EXPERIMENTS.md](EXPERIMENTS.md) for full reproduction instructions.
+- **100% proof success** on all 15 classical tautologies (2-10 step proofs, <3ms each)
+- **Exponential phase transition** observed on random 3-CNF (CDCL 47% at ratio 4.25 vs DPLL 0%)
+- **Mechanically verified** soundness and completeness in Rocq/Coq 8.19
+- **PHP_4^5**: NP+ATSS=UNKNOWN (5.6s), Glucose4=UNSAT (1.1ms) — expected CDCL limitation
+- **GNN-ATSS**: Cosine 0.13ms / Blended 0.03ms / GNN 26.1ms, all 100% solve rate on EXP-8
 
 ## Paper
 
-The accompanying paper is formatted for LICS/CAV (IEEEtran):
+The accompanying paper is formatted for LICS/CAV (IEEEtran, 10 pages):
 
 ```
 paper/
 ├── neuroproof.tex      # Main manuscript
-├── references.bib      # Bibliography (79 entries)
+├── references.bib      # Bibliography (50 entries)
 ├── IEEEtran.cls         # IEEE style
 ├── IEEEbib.bst          # IEEE bibliography style
 └── neuroproof.pdf       # Compiled PDF
 ```
 
-Key results:
-- **100% proof success** on all 15 classical tautologies (2-10 step proofs)
-- **Exponential phase transition** observed on random 3-CNF (CDCL 47% at ratio 4.25 vs DPLL 0%)
-- **Mechanically verified** soundness and completeness in Rocq/Coq 8.19
-- **GNN-ATSS** achieves 100% solve rate on EXP-9 tautologies (26.1ms/inference)
-
 ## Citation
 
 ```bibtex
 @article{qu2026neuroproof,
-  title={NeuroProof: A Hybrid Propositional Proof System with Adaptive Tactic Synthesis and Certified Proof Checking},
+  title={NeuroProof: A Hybrid Propositional Proof System with
+         Adaptive Tactic Synthesis and Certified Proof Checking},
   author={Qu, Guanheng and Zhang, Chunxiao and Liu, Jiangming},
-  journal={},
   year={2026}
 }
 ```

@@ -39,7 +39,7 @@
 \newtheorem{remark}[theorem]{Remark}
 
 % --- Proof environment (since we cannot use amsthm with IEEEtran) ---
-\newenvironment{proof}[1][Proof]{\textbf{#1.} }{\hfill$\square$}
+\newenvironment{proof}[1][Proof]{\textbf{#1.} }{\hfill$\blacksquare$}
 
 % --- Proof rule macros ---
 \newcommand{\seq}[2]{#1 \vdash #2}
@@ -159,10 +159,10 @@ for practical certified proving.
 
 \paragraph{Design principle: minimal \TCB{} with maximal automation.}
 Our Trusted Computing Base (\TCB{}) comprises the trusted
-verification kernel (285~lines) that performs structural
+verification kernel that performs structural
 rule-checking on every proof step.  Crucially, the same rules are
 \emph{independently} formalised and machine-checked in
-Rocq~\cite{CoqDevelopmentTeam2024} (487~lines), establishing a
+Rocq~\cite{CoqDevelopmentTeam2024}, establishing a
 dual-track verification chain.  This design follows the de~Bruijn
 criterion~\cite{Harrison2009}: the proof certificate is checkable by
 a program that is itself formally verified.  Unlike approaches that
@@ -366,7 +366,7 @@ if $v \entails \varphi$ for all $v$.
 \subsection{Natural Deduction Rules}
 
 \NP{} uses the Prawitz--Gentzen natural deduction
-calculus~\cite{Prawitz1965} with all standard rules:
+calculus~\cite{Prawitz1965,Gentzen1969} with all standard rules:
 
 \medskip
 \begin{gather}
@@ -561,7 +561,7 @@ The key bridge rules are:
       \NP{} contains these rules, \NP{} is complete.
   \end{enumerate}
   The composition of three polynomial-time translations is
-  polynomial-time, establishing p-simulation.  \hfill$\square$
+  polynomial-time, establishing p-simulation.
 \end{proof}
 
 \subsection{Novel Rules}
@@ -747,7 +747,6 @@ where $\gamma \in (0,1)$ is the decay factor (default $\gamma=0.95$).
   drift by more than~$\eta$.  This is satisfied in practice because
   ATSS groups statistics by formula hash, and structurally similar
   formulas tend to have similar tactic success profiles.
-  \hfill$\square$
 \end{proof}
 
 \begin{corollary}[Concrete bound]
@@ -861,7 +860,6 @@ Resolution on pivot variable $x$ propagates the interpolant:
     |\Pi'| = s - \sum_{i=1}^{m}(k_i - 1) c_i
            \leq s - \Omega(\log s).
   \]
-  \hfill$\square$
 \end{proof}
 
 \begin{corollary}
@@ -875,7 +873,7 @@ Resolution on pivot variable $x$ propagates the interpolant:
 \section{Rocq/Coq Formalisation}
 \label{sec:rocq}
 
-The \NP{} kernel is formalised in Rocq/Coq~8.19+ (487~lines).
+The \NP{} kernel is formalised in Rocq/Coq~8.19+.
 The formalisation provides:
 
 \begin{itemize}
@@ -1504,7 +1502,7 @@ where $\bar{\mu} = \sum w_j \mathbb{E}[X_j] / W^{(N)}
   \boxed{N \geq
     \frac{k \ln(k/\delta)}{4\varepsilon^2(1-\gamma)}.}
 \]
-\hfill$\square$
+\hfill$\blacksquare$
 
 \subsection{Full Rule Set}
 
