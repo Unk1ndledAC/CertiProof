@@ -199,11 +199,14 @@ paper/
 
 ## Citation
 
+This project was archived in Zenodo [![DOI](https://zenodo.org/badge/1230812812.svg)](https://doi.org/10.5281/zenodo.20382686).
+
 ```bibtex
 @article{qu2026neuroproof,
   title={NeuroProof: A Hybrid Propositional Proof System with
          Adaptive Tactic Synthesis and Certified Proof Checking},
   author={Qu, Guanheng and Zhang, Chunxiao and Liu, Jiangming},
   year={2026}
+  doi={10.5281/zenodo.20382686}
 }
 ```
