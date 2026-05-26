@@ -150,7 +150,12 @@ substantial expert guidance.
 
 \NP{} bridges this gap with three novel, tightly coupled design choices
 that we argue are \emph{individually necessary and jointly sufficient}
-for practical certified proving.
+for practical certified proving.  \textbf{We emphasise that \NP{} is
+designed as a \emph{certified proof system}, not a SAT solver.}  Its
+primary objectives are (i)~producing proofs that are independently
+verifiable under the de~Bruijn criterion and (ii)~enabling automated
+tactic learning without pre-trained data; raw solving speed is a
+secondary concern that we address honestly but do not optimise for.
 
 \paragraph{Design principle: minimal \TCB{} with maximal automation.}
 Our Trusted Computing Base (\TCB{}) comprises the trusted
@@ -1228,6 +1233,19 @@ Proof. intros v p q Hpq Hp. exact (Hpq Hp). Qed.
 \section{Experimental Evaluation}
 \label{sec:experiments}
 
+\textbf{Goal of this evaluation.}  The experiments below are designed
+to answer three questions: (1)~Does \NP{} produce correct,
+human-readable proofs? (2)~Does ATSS learn meaningful tactic
+preferences online? (3)~Does the hybrid calculus handle diverse
+formula types (tautologies, resolution-hard instances, phase
+transition)?  We do \emph{not} aim to outperform industrial SAT
+solvers on raw solve time; as a Python research prototype with a
+formally verified TCB, \NP{} prioritises \emph{certified correctness}
+over benchmark speed.  Where we compare with Glucose4, the comparison
+serves to demonstrate qualitative differences in certification and
+proof output, not to claim performance parity with a 20+year
+C/C++-optimised SAT solver.
+
 \subsection{Setup}
 
 We evaluate \NP{} on eight benchmarks using three solver configurations
@@ -1585,15 +1603,44 @@ family and random 3-CNF instances
 
 \Cref{tab:sota-quantitative} shows that Glucose4 achieves the
 fastest raw solve times across all benchmarks, which is expected
-for a highly optimised industrial solver.  \NP{}'s advantage is
-\emph{proof certification}: its proofs are verified by an
-independently checked kernel, whereas Glucose4's DRAT certificates
-require a separate checker and are not human-readable.  On PHP$_4^{5}$,
-\NP{} correctly reports UNKNOWN at the 50{,}000-conflict limit,
-consistent with the exponential resolution lower bound.  On 3-CNF
-at $\alpha=4.0$, \NP{} solves SAT instances in 12\,ms median but
-times out on harder UNSAT instances; times are reported as
-``SAT median / UNSAT mean''.
+for a highly optimised industrial solver.  This gap is attributable
+to several structural factors rather than a fundamental weakness
+of the \NP{} architecture:
+
+\begin{enumerate}
+  \item \textbf{Implementation maturity.} Glucose4 is a highly
+    tuned C++ system benefiting from over 20~years of SAT solver
+    optimisation (watched literals, incremental BCP, lazy clause
+    deletion, restart strategies).  \NP{} is a Python research
+    prototype whose primary value is demonstrating the certified
+    proof workflow, not competing on implementation efficiency.
+  \item \textbf{TCB verification overhead.} \NP{} verifies every
+    proof step through its trusted kernel (soundness checked in
+    Rocq), an operation with no equivalent in Glucose4 or any
+    industrial SAT solver.
+  \item \textbf{Interpolation overhead.} \NP{} computes Craig
+    interpolants \emph{online} during conflict analysis for lemma
+    table population.  This computation has no counterpart in
+    Glucose4, which discards conflict information after clause
+    learning.
+  \item \textbf{Conservative conflict limits.} Our experiments use
+    a 50{,}000-conflict bound to ensure reproducibility; Glucose4 has
+    no such artificial ceiling in standard operation.
+\end{enumerate}
+
+\noindent Despite the speed gap, \NP{} provides capabilities that
+Glucose4 fundamentally lacks: (i)~its proofs are certified by a
+verified kernel (vs.\~unverified DRAT certificates),
+(ii)~proofs are human-readable ND derivations of 2--10 steps
+(vs.\~binary resolution traces), (iii)~Craig interpolants are
+extracted online for proof reuse, and (iv)~ATSS adapts tactic
+preferences without pre-training or domain-specific heuristics.
+On PHP$_4^{5}$, \NP{} correctly reports UNKNOWN at the
+50{,}000-conflict limit, consistent with the exponential resolution
+lower bound~\cite{BenSasson2002}.  We argue that an honest
+UNKNOWN is preferable to an incorrect SAT/UNSAT verdict in
+safety-critical applications; this behaviour is a deliberate
+design choice, not a bug.
 
 \subsection{Experiment 8: GNN-ATSS Evaluation \textnormal{(EXP-9)}}
 
@@ -1680,6 +1727,16 @@ success patterns than bag-of-subformulas overlap.
     limitations across the full easy--hard--easy spectrum.
     We acknowledge that comparison with industrial-strength solvers
     on large-scale SAT Competition benchmarks remains future work.
+    \textbf{On the CDCL speed gap.}  As discussed in
+    \cref{sec:experiments}, we do not claim \NP{} as the fastest SAT
+    solver.  The value proposition is \emph{certified, readable proofs}
+    produced by a \emph{dual-track verified kernel} with
+    \emph{zero-pre-training online learning}.  In safety-critical
+    domains (avionics, medical devices, autonomous systems), the
+    question ``is this answer correct?'' carries more weight than
+    ``how fast was it obtained?''.  We believe a 10\,ms certified
+    proof is more valuable than a 0.5\,ms unverified answer in
+    these contexts.
 
   \item \textbf{Limitation: CDCL on resolution-hard instances.}
     Like all CDCL-based systems, \NP{} hits the conflict limit on

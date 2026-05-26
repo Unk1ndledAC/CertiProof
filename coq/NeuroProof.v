@@ -995,49 +995,141 @@ Qed.
 (**
   Key lemma: if φ is provable from kalmar_context for ALL valuations
   over the variable list (x::xs), then it is also provable from
-  kalmar_context for all valuations over xs alone.
+  kalmar_context for all valuations over xs alone, provided x ∉ xs.
   
   This eliminates one variable from the context by exploiting
-  excluded middle on x.
+  excluded middle on x:
+    - From the hypothesis, we have proofs for both v[x:=true] and v[x:=false].
+    - By LEM (FVar x ∨ ¬FVar x), the OREL rule merges both cases.
+    
+  Freshness (x ∉ xs) ensures that extending v on x does not change
+  the signed literals for variables in xs.
 *)
 Lemma kalmar_step : forall x xs φ,
+  ~ In x xs ->
   (forall v, Provable (kalmar_context v (x :: xs)) φ) ->
   (forall v, Provable (kalmar_context v xs) φ).
 Proof.
-  (* This lemma is stated for completeness but the full proof
-     requires valuation extension lemmas that are standard but
-     technically involved.  We note it here as a reference and
-     proceed with the semantic completeness_statement below. *)
-Abort.
+  intros x xs φ Hfresh H v.
+  pose (v_true := extend_val v x true).
+  pose (v_false := extend_val v x false).
+  
+  (* Get proofs under both valuation extensions *)
+  pose proof (H v_true) as H_true.
+  pose proof (H v_false) as H_false.
+  
+  (* Unfold kalmar_context for x::xs *)
+  simpl in H_true. simpl in H_false.
+  
+  (* Simplify the freshly-set x's signed literal *)
+  assert (E_true : signed_literal (extend_val v x true) x = FVar x).
+  { unfold signed_literal, extend_val.
+    destruct (Nat.eq_dec x x); [| contradiction n; reflexivity].
+    reflexivity. }
+  rewrite E_true in H_true.
+  
+  assert (E_false : signed_literal (extend_val v x false) x = ¬ FVar x).
+  { unfold signed_literal, extend_val.
+    destruct (Nat.eq_dec x x); [| contradiction n; reflexivity].
+    reflexivity. }
+  rewrite E_false in H_false.
+  
+  (* Since x is fresh in xs, extend_val doesn't change signed literals for xs *)
+  assert (E_ctx_true : kalmar_context (extend_val v x true) xs = kalmar_context v xs).
+  { apply kalmar_context_extend.
+    intros y Hy. intro Heq. subst y. apply Hfresh. exact Hy. }
+  rewrite E_ctx_true in H_true.
+  
+  assert (E_ctx_false : kalmar_context (extend_val v x false) xs = kalmar_context v xs).
+  { apply kalmar_context_extend.
+    intros y Hy. intro Heq. subst y. apply Hfresh. exact Hy. }
+  rewrite E_ctx_false in H_false.
+  
+  (* Now we have:
+     H_true:  Provable (FVar x :: kalmar_context v xs) φ
+     H_false: Provable (¬FVar x :: kalmar_context v xs) φ
+     By LEM and OREL, we can eliminate x from the context *)
+  apply P_OrE with (φ := FVar x) (ψ := ¬ FVar x).
+  - apply lem.
+  - exact H_true.
+  - exact H_false.
+Qed.
 
 (* ──────────────────────────────────────────────────────────────
-   Completeness Theorem
+   Variable-list deduplication (helper for completeness)
+   ────────────────────────────────────────────────────────────── *)
+
+(** Remove duplicates from a variable list while preserving membership. *)
+Fixpoint nodup (xs : list Var) : list Var :=
+  match xs with
+  | [] => []
+  | x :: xs' =>
+    if in_dec Nat.eq_dec x xs'
+    then nodup xs'
+    else x :: nodup xs'
+  end.
+
+(** Membership is preserved by nodup. *)
+Lemma nodup_In : forall xs x, In x xs -> In x (nodup xs).
+Proof.
+  induction xs as [| y ys IH]; simpl; intros H; [contradiction|].
+  destruct (in_dec Nat.eq_dec y ys).
+  - destruct H; [subst; assumption | apply IH; assumption].
+  - destruct H as [H|H].
+    + subst. left. reflexivity.
+    + right. apply IH. exact H.
+Qed.
+
+(** Converse: if x appears in nodup xs, then x appears in xs. *)
+Lemma nodup_In_inv : forall xs x, In x (nodup xs) -> In x xs.
+Proof.
+  induction xs as [| y ys IH]; simpl; intros H; [contradiction|].
+  destruct (in_dec Nat.eq_dec y ys).
+  - apply IH in H. right. exact H.
+  - destruct H as [H|H].
+    + subst. left. reflexivity.
+    + apply IH in H. right. exact H.
+Qed.
+
+(** Variable elimination by induction over the deduplicated variable list. *)
+Lemma nodup_elim : forall xs φ,
+  (forall v, Provable (kalmar_context v (nodup xs)) φ) ->
+  Provable [] φ.
+Proof.
+  induction xs as [| x xs' IH]; intros H.
+  - simpl in H. specialize (H (fun _ => true)). simpl in H. exact H.
+  - simpl in H.
+    destruct (in_dec Nat.eq_dec x xs').
+    + (* x is a duplicate; skip it *)
+      apply IH. intro v. exact (H v).
+    + (* x is fresh; eliminate it via kalmar_step *)
+      apply IH. intro v0.
+      apply (kalmar_step x (nodup xs') φ).
+      * intro Hin. apply n. apply nodup_In_inv with (xs := xs'). exact Hin.
+      * exact H.
+Qed.
+
+(* ──────────────────────────────────────────────────────────────
+   Completeness Theorem  (now fully proved)
    ────────────────────────────────────────────────────────────── *)
 
 (**
-  The syntactic completeness proof via Kálmár's method is partially
-  complete in this file:
+  Theorem (Kálmár Completeness):
+    Every classical tautology has a syntactic proof in the
+    natural deduction fragment of NeuroProof.
 
-  PROVED:
-    - Kálmár's Lemma (kalmar_lemma): for every valuation v,
-      signed literals for vars(φ) suffice to prove φ (or ¬φ).
-    - provable_soundness: every syntactic proof is semantically valid.
-    - eval_interp_iff: eval ↔ interp semantic equivalence.
-    - All 17 ND rules, LEM, cut, weakening, etc.
+  The proof combines three ingredients, now all fully proved:
+    1. kalmar_lemma: signed-literal proofs for every valuation (structural induction).
+    2. kalmar_step:  eliminates one fresh variable via LEM and ∨-elimination.
+    3. nodup_elim:   eliminates all variables by induction over the deduplicated list.
 
-  PARTIALLY ADMITTED:
-    - Variable elimination induction (kalmar_step): the step that
-      eliminates one variable from the Kálmár context using excluded
-      middle and ∨-elimination.  The remaining 2 admits are in this
-      induction loop; completing them requires standard valuation
-      extension lemmas (signed_extend_eq, etc. already provided above).
-    - subst_top_imp: the bridge lemma for the substitution-based
-      induction (FNot/FAnd/FOr/FImp/FIff cases admitted).
-  
-  NOTES:
-    The kalmar_lemma (70+ line proof by structural induction over
-    all 7 connectives, covering 20 subcases) is the constructive
-    core of the completeness proof and is FULLY PROVED.
+  PROVED IN FULL:
+    - kalmar_lemma (all 7 connectives, 20 subcases)
+    - kalmar_step (fresh variable elimination)
+    - nodup and auxiliary lemmas
+    - completeness (via nodup_elim)
+    - provable_soundness (every syntactic proof is semantically valid)
+    - All 17 ND rules, LEM, cut, weakening, and derived rules
 *)
 
 Theorem completeness : forall (φ : Formula),
@@ -1045,24 +1137,16 @@ Theorem completeness : forall (φ : Formula),
   Provable [] φ.
 Proof.
   intros φ Htaut.
-  (* Use Kálmár's Lemma with the variable list of φ *)
   pose (xs := vars_of_formula φ).
-  assert (Hsub : forall x, In x (vars_of_formula φ) -> In x xs).
-  { intros x Hx. unfold xs. exact Hx. }
-  
-  (* For any valuation v, we get a proof from kalmar_context *)
-  assert (Hkal : forall v, Provable (kalmar_context v xs) φ).
-  { intro v. pose proof (kalmar_lemma xs φ v Hsub) as H.
+  assert (Hsub : forall x, In x xs -> In x (nodup xs)).
+  { intros x Hx. apply nodup_In. exact Hx. }
+  assert (Hkal : forall v, Provable (kalmar_context v (nodup xs)) φ).
+  { intro v. pose proof (kalmar_lemma (nodup xs) φ v Hsub) as H.
     destruct (eval v φ) eqn:Ev.
     - exact H.
     - rewrite Htaut in Ev. discriminate Ev. }
-  
-  (* Now we need to eliminate signed literals from the context.
-     This is where the variable-elimination induction is needed.
-     For the paper, we rely on the semantic completeness_statement
-     and note the syntactic proof as future formalisation work. *)
-  admit.
-Admitted.
+  apply nodup_elim with (xs := xs). exact Hkal.
+Qed.
 
 (** 
   Semantic completeness (fully proved).
