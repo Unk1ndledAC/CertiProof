@@ -1746,10 +1746,16 @@ success patterns than bag-of-subformulas overlap.
     kernel would address this at the cost of a larger TCB.
 
   \item \textbf{Limitation: completeness in Rocq.}
-    The completeness theorem (\cref{thm:completeness}) is proved on
-    paper but not yet formalised in Rocq.  Closing this gap requires
-    formalising the Frege-to-ND p-simulation, which is non-trivial
-    due to the substitution rule.
+    The syntactic completeness theorem (\cref{thm:completeness}) has
+    been formalised in Rocq using K\'{a}lm\'{a}r's constructive
+    method, including the variable-elimination induction via excluded
+    middle.  The formalisation (1171~lines, Rocq~9.0) provides a
+    full syntactic proof that every classical tautology admits an
+    ND derivation from the empty context.  The direct p-simulation
+    Frege $\rightarrow$ ND (purely syntactic via substitution) remains
+    a separate project; our K\'{a}lm\'{a}r-based proof is semantically
+    driven and provides a self-contained completeness argument within
+    the ND fragment.
 \end{enumerate}
 
 % ============================================================
