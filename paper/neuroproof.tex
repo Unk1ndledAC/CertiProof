@@ -1805,31 +1805,6 @@ interpolants.  This feedback loop is the key architectural
 contribution that distinguishes \NP{} from systems that treat
 search, learning, and verification as separate modules.
 
-\paragraph{Future work.}
-\begin{enumerate}
-  \item \textbf{Extended resolution in CDCL.}  Adding extended
-    resolution to the solver kernel would polynomially simulate
-    Frege, potentially resolving the PHP limitation
-    (\cref{tab:pigeonhole}) and enabling short proofs of Tseitin
-    formulas.
-  \item \textbf{Rocq completeness proof.}  Formalising the
-    Frege-to-ND simulation would close the remaining verification
-    gap.
-  \item \textbf{First-order extension.}  Lifting to first-order
-    logic via Skolemisation and Herbrand's theorem.
-  \item \textbf{Lean~4 integration.}  Using
-    Lean~4~\cite{MouraKong2021} as an alternative trusted kernel,
-    leveraging its more powerful metaprogramming facilities.
-  \item \textbf{Large-scale benchmarks.}  Evaluating \NP{} on
-    SAT Competition~\cite{BiereSATCompetition2024} benchmarks and
-    comparing certified proof size against DRAT/LRAT
-    certificates~\cite{LammichLRAT2024}.
-  \item \textbf{ATSS enhancements.}  Replacing the symbolic
-    bag-of-subformulas embedding with a lightweight neural
-    embedding (e.g., graph neural network over the formula AST)
-    while maintaining the online learning property.
-\end{enumerate}
-
 % ============================================================
 % Acknowledgements (anonymised for review)
 % ============================================================
