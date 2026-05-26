@@ -137,7 +137,7 @@ def plot_fig1_classical_tautologies():
 
     ax.set_ylabel('Proof Size')
     ax.set_xlabel('Formula')
-    ax.set_title('Fig 1: Classical Tautology Proof Sizes (ATSS vs noATSS)')
+    #ax.set_title('Fig 1: Classical Tautology Proof Sizes (ATSS vs noATSS)')
     ax.set_xticks(x)
     ax.set_xticklabels(short_labels, rotation=35, ha='right', fontsize=7)
     ax.legend(loc='upper left')
@@ -191,8 +191,7 @@ def plot_fig2_pigeonhole():
     ax2.set_ylim(-5, 115)
     ax2.grid(alpha=0.3)
 
-    fig.suptitle('Figure 2: Pigeonhole Principle Performance',
-                 fontsize=14, y=1.01)
+    #fig.suptitle('Figure 2: Pigeonhole Principle Performance', fontsize=14, y=1.01)
     fig.tight_layout()
     _save(fig, 'fig2_pigeonhole.pdf')
 
@@ -257,7 +256,7 @@ def plot_fig3_phase_transition():
     ax2.set_ylim(-0.05, 1.15)
     ax2.grid(alpha=0.3)
 
-    fig.suptitle('Figure 3: Phase Transition at n=20', fontsize=14, y=1.01)
+    #fig.suptitle('Figure 3: Phase Transition at n=20', fontsize=14, y=1.01)
     fig.tight_layout()
     _save(fig, 'fig3_phase_transition.pdf')
 
@@ -322,7 +321,7 @@ def plot_fig4_proof_quality():
     ax3.set_title('(c) Solve Time')
     ax3.legend(fontsize=8)
 
-    fig.suptitle('Figure 4: ATSS vs noATSS Proof Quality', fontsize=14, y=1.02)
+    #fig.suptitle('Figure 4: ATSS vs noATSS Proof Quality', fontsize=14, y=1.02)
     fig.tight_layout()
     _save(fig, 'fig4_proof_quality.pdf')
 
@@ -404,8 +403,7 @@ def plot_fig5_ablation():
     ax3.set_yscale('log')
     ax3.legend(fontsize=8)
 
-    fig.suptitle('Figure 5: Ablation Study Across Difficulty Levels',
-                 fontsize=14, y=1.02)
+    #fig.suptitle('Figure 5: Ablation Study Across Difficulty Levels', fontsize=14, y=1.02)
     fig.tight_layout()
     _save(fig, 'fig5_ablation.pdf')
 
@@ -465,7 +463,7 @@ def plot_fig6_scalability():
     ax2.legend(fontsize=9)
     ax2.grid(alpha=0.3, which='both')
 
-    fig.suptitle('Figure 6: Scalability at Phase Transition', fontsize=14, y=1.01)
+    #fig.suptitle('Figure 6: Scalability at Phase Transition', fontsize=14, y=1.01)
     fig.tight_layout()
     _save(fig, 'fig6_scalability.pdf')
 
@@ -519,7 +517,7 @@ def plot_fig7_sota_comparison():
     ax2.set_title('(b) Certified Proof Output')
     ax2.set_ylim(0, 4)
 
-    fig.suptitle('Figure 7: SOTA Comparison', fontsize=14, y=1.01)
+    #fig.suptitle('Figure 7: SOTA Comparison', fontsize=14, y=1.01)
     fig.tight_layout()
     _save(fig, 'fig7_sota_comparison.pdf')
 
@@ -591,8 +589,7 @@ def plot_fig8_gnn_atss():
     ax3.set_title('(c) Proof Size')
     ax3.legend(fontsize=8)
 
-    fig.suptitle('Figure 8: GNN-ATSS Configuration Comparison',
-                 fontsize=14, y=1.02)
+    #fig.suptitle('Figure 8: GNN-ATSS Configuration Comparison', fontsize=14, y=1.02)
     fig.tight_layout()
     _save(fig, 'fig8_gnn_atss.pdf')
 
@@ -657,7 +654,7 @@ def plot_fig9_atss_learning():
     ax3.legend(fontsize=9)
     ax3.grid(alpha=0.3)
 
-    fig.suptitle('Figure 9: ATSS Online Learning Curve', fontsize=14, y=1.02)
+    #fig.suptitle('Figure 9: ATSS Online Learning Curve', fontsize=14, y=1.02)
     fig.tight_layout()
     _save(fig, 'fig9_atss_learning.pdf')
 
@@ -740,8 +737,7 @@ def plot_fig10_virtuous_cycle():
     cbar = plt.colorbar(ax4.collections[0], ax=ax4, label='Cycle')
     ax4.grid(alpha=0.3)
 
-    fig.suptitle('Figure 10: Virtuous Cycle — CDCL to ATSS Feedback Loop',
-                 fontsize=14, y=1.01)
+    #fig.suptitle('Figure 10: Virtuous Cycle — CDCL to ATSS Feedback Loop', fontsize=14, y=1.01)
     fig.tight_layout()
     _save(fig, 'fig10_virtuous_cycle.pdf')
 
@@ -808,8 +804,7 @@ def plot_fig11_frege_extension():
     ax2.legend(fontsize=9)
     ax2.grid(alpha=0.3, axis='y')
 
-    fig.suptitle('Figure 11: Extended Frege Resolution (Polynomial Speedup)',
-                 fontsize=14, y=1.01)
+    #fig.suptitle('Figure 11: Extended Frege Resolution (Polynomial Speedup)', fontsize=14, y=1.01)
     fig.tight_layout()
     _save(fig, 'fig11_frege_extension.pdf')
 
@@ -850,7 +845,7 @@ def plot_fig12_operation_costs():
     ax.set_xticks(x)
     ax.set_xticklabels(operations, fontsize=8)
     ax.set_ylabel('Cost per Operation (us)')
-    ax.set_title('Figure 12: Operation Primitive Cost Comparison — Python vs C/C++')
+    #ax.set_title('Figure 12: Operation Primitive Cost Comparison — Python vs C/C++')
     ax.set_yscale('log')
     ax.legend(fontsize=10)
 
