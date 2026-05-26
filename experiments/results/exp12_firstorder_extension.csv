@@ -1,0 +1,11 @@
+problem,domain,time_s,status,skolem_steps
+"Graph Coloring (K=3, V=5)",Graph Theory,0.015,SAT,5
+"Graph Coloring (K=3, V=10)",Graph Theory,0.18,SAT,12
+"Graph Coloring (K=3, V=20)",Graph Theory,5.2,UNKNOWN,18
+PHP at FO level (n=2),Set Theory,0.008,UNSAT,3
+PHP at FO level (n=3),Set Theory,0.065,UNSAT,6
+PHP at FO level (n=4),Set Theory,3.8,UNKNOWN,9
+Equivalence Relation,Algebra,0.022,SAT,4
+Partial Order Antisymmetry,Algebra,0.018,SAT,3
+Transitive Closure,Model Theory,0.095,SAT,8
+Dense Linear Order,Model Theory,0.042,SAT,6

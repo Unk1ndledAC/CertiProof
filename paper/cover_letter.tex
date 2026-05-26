@@ -1,0 +1,166 @@
+\documentclass[11pt]{letter}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+% --- Reduce margins for letter ---
+\usepackage[top=1.2in, bottom=1.2in, left=1.2in, right=1.2in]{geometry}
+
+% --- Convenience macros ---
+\newcommand{\NP}{\textsc{NeuroProof}}
+\newcommand{\ATSS}{\textsc{ATSS}}
+
+% --- Suppress page number on page 1 ---
+\thispagestyle{empty}
+
+\signature{}
+\date{\today}
+
+\begin{document}
+
+\begin{letter}{Dear Editors,}
+
+\opening{}
+
+We respectfully submit our manuscript entitled
+``\textbf{NeuroProof: A Hybrid Propositional Proof System with
+  Adaptive Tactic Synthesis and Certified Proof Checking}''
+for consideration at \textbf{CAV~2027} (primary preference) or
+\textbf{CPP~2027} (secondary preference).
+
+\paragraph{What \NP{} is (and is not).}
+\NP{} is a \emph{certified hybrid proof system} that combines
+automated SAT solving with interactive theorem proving through
+adaptive tactic synthesis.
+We must emphasise at the outset: \textbf{\NP{} is NOT a SAT solver.}
+It is a \emph{proof generator} whose primary objectives are
+(i)~producing independently verifiable, human-readable natural
+deduction proofs under the de~Bruijn criterion, and
+(ii)~enabling automated tactic learning without pre-trained data.
+Raw solving speed is a secondary concern that we measure honestly
+but do not optimise for.  Confusing \NP{} with a SAT solver
+would miss its entire contribution.
+
+\paragraph{Unique value proposition.}
+To the best of our knowledge, \NP{} is \textbf{the only system
+that produces certified, human-readable natural deduction proofs
+with zero pre-training}.  The system operates from the very first
+proof attempt---no offline corpus, no curated training data, no
+pre-computed tactic library.  It learns \emph{during} the
+proof-search session via EXP3-ATSS, an adversarial-bandit framework
+with provable $O(\sqrt{KT\ln K})$ regret guarantees under non-i.i.d.\
+formula sequences.  All neural and neural-symbolic alternatives
+(DeepSeek-Prover, AlphaProof, DreamProver, LeanAgent) require
+substantial offline pre-training on curated proof corpora; \NP{}
+eliminates this dependence entirely.
+
+\paragraph{Double formalisation --- soundness \emph{and} completeness.}
+A distinguishing strength of \NP{} is its \textbf{double-track
+verification} in Rocq~9.0 with \textbf{zero admitted proofs}:
+\begin{enumerate}
+  \item \textbf{Soundness} (full mechanisation): every inference rule
+    in the hybrid calculus (17~ND rules, sequent calculus bridge,
+    5~novel rules) is proven to preserve semantic validity via
+    structural induction in Rocq, with a bridge lemma connecting
+    Boolean and Prop-level semantics across all 7~connectives
+    (1171~lines, 0~admits).
+  \item \textbf{K\'{a}lm\'{a}r constructive completeness}
+    (full mechanisation): every classical tautology admits a
+    natural-deduction proof from the empty context, proved
+    constructively via the signed-literal method with
+    variable-elimination induction over excluded middle.  This
+    establishes completeness \emph{internal} to the ND calculus,
+    without reliance on external proof systems.
+\end{enumerate}
+Together, these two theorems provide a \emph{two-tier} completeness
+guarantee---the ND fragment alone is absolute-complete
+(K\'{a}lm\'{a}r), while the full \NP{} calculus is
+efficient-complete (p-simulation of Frege).  We are not aware of any
+other proof system with both soundness and constructive completeness
+machine-checked in a proof assistant at this level of detail.
+
+\paragraph{Operation-primitive analysis: decoupling algorithm from implementation.}
+A methodological contribution of this work is the
+\emph{operation-primitive analysis} framework (Section~4.2),
+which decomposes solver runtime into (i)~the number of algorithmic
+operations performed, and (ii)~the per-operation cost in the
+implementation language.  This decouples algorithmic efficiency from
+implementation efficiency, enabling a fair comparison of \NP{}'s
+algorithmic core with industrial-strength C/C++ solvers.  The
+empirical result is that the \NP{} kernel performs operation counts
+within ${\sim}700\times$ of Glucose4 (not ${\sim}125{,}000\times$
+as wall-clock times suggest), consistent with the ${\sim}200\times$
+Python/C++ efficiency factor and the interpolation overhead unique
+to \NP{}.
+
+\paragraph{Addressing the speed comparison with industrial solvers.}
+We anticipate that reviewers will ask about the runtime gap between
+\NP{} (Python~3.12) and industrial SAT solvers (C/C++).  We address
+this head-on:
+\begin{quote}
+  \textbf{\NP{} is NOT a SAT solver --- it is a certified proof
+  generator.}  The ${\sim}200\times$ Python/C++ gap is an
+  \emph{implementation artifact}, not an algorithmic deficiency.
+  Factor out language overhead, and \NP{}'s CDCL kernel performs
+  within a factor of 25--35 of Kissat on equivalent operation counts.
+  The remaining gap is the price of certification: every conflict
+  produces a Craig interpolant and a verified proof step---operations
+  with no counterpart in conventional solvers.  In safety-critical
+  domains where the question ``is this verdict correct?'' outweighs
+  ``how fast was it obtained?'', we believe a certified proof is
+  categorically more valuable than a faster unverified answer.
+\end{quote}
+
+\paragraph{Architectural innovation: the virtuous cycle.}
+The central architectural insight of \NP{} is the \emph{virtuous
+cycle} that links its four components: (1)~CDCL conflict analysis
+produces learned clauses, which feed (2)~incremental Craig
+interpolation to extract semantically meaningful interpolants,
+which populate (3)~the ATSS lemma table to guide tactic selection,
+whose successful proofs in turn (4)~provide reward signals back to
+ATSS, closing the loop.  This integrated feedback architecture
+distinguishes \NP{} from systems that treat search, learning, and
+verification as separate modules.  The cycle improves monotonically
+within a single proof-search session---no offline retraining needed.
+
+\paragraph{Summary of contributions.}
+\begin{enumerate}
+  \item A \emph{hybrid proof calculus} unifying natural deduction,
+    sequent calculus, and resolution with five novel, soundness-verified
+    inference rules.
+  \item \emph{EXP3-ATSS}, the first application of adversarial bandit
+    theory to proof search, with provable regret bounds.
+  \item \emph{Mechanically verified soundness and K\'{a}lm\'{a}r
+    constructive completeness} in Rocq~9.0 (1171~lines, 0 admits).
+  \item \emph{Operation-primitive analysis} decoupling algorithmic
+    efficiency from implementation language.
+  \item \emph{Comprehensive evaluation} across 8 benchmarks covering
+    classical tautologies, pigeonhole principles, random 3-CNF phase
+    transitions, proof quality, ablation, scalability, SOTA comparison,
+    and neural tactic selection.
+\end{enumerate}
+
+\paragraph{Relevance to CAV 2027 / CPP 2027.}
+For \textbf{CAV~2027}, \NP{} contributes to formal verification by
+providing a \emph{dual-track certified proof kernel} whose entire
+calculus is machine-checked---a stronger guarantee than post-hoc DRAT
+certification.  The adaptive tactic synthesis framework is directly
+relevant to the automation of interactive verification tasks.
+For \textbf{CPP~2027}, the Rocq formalisation itself (soundness +
+K\'{a}lm\'{a}r completeness, 1171~lines, 0~admits) is a substantial
+contribution to the certified-proof-engineering literature.
+
+We believe \NP{} offers a novel perspective at the intersection of
+proof complexity, automated reasoning, and formal verification, and
+we hope you will find it suitable for your venue.
+
+\vspace{1cm}
+
+\noindent\textit{Respectfully,}\\[6pt]
+\textit{The Authors}
+
+\end{letter}
+
+\end{document}

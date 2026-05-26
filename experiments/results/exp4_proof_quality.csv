@@ -1,0 +1,31 @@
+formula,solver,size,depth,time_us,status
+p -> p,ATSS,2,1,36,PROVED
+p -> p,noATSS,2,1,39,PROVED
+(p & q) -> p,ATSS,3,2,51,PROVED
+(p & q) -> p,noATSS,3,2,59,PROVED
+p -> (p | q),ATSS,3,2,62,PROVED
+p -> (p | q),noATSS,3,2,73,PROVED
+(p -> q) -> (q -> r) -> (p -> r),ATSS,8,5,154,PROVED
+(p -> q) -> (q -> r) -> (p -> r),noATSS,8,5,182,PROVED
+p -> (q -> p),ATSS,3,2,60,PROVED
+p -> (q -> p),noATSS,3,2,72,PROVED
+p | ~p,ATSS,2,1,404,PROVED
+p | ~p,noATSS,2,1,483,PROVED
+~(p & ~p),ATSS,3,2,281,PROVED
+~(p & ~p),noATSS,3,2,343,PROVED
+(p -> q) -> (~q -> ~p),ATSS,5,4,469,PROVED
+(p -> q) -> (~q -> ~p),noATSS,5,4,559,PROVED
+(~p -> ~q) -> (q -> p),ATSS,4,3,507,PROVED
+(~p -> ~q) -> (q -> p),noATSS,4,3,573,PROVED
+((p | q) & ~p) -> q,ATSS,3,2,472,PROVED
+((p | q) & ~p) -> q,noATSS,3,2,551,PROVED
+(p -> q) -> ((p -> ~q) -> ~p),ATSS,9,5,130,PROVED
+(p -> q) -> ((p -> ~q) -> ~p),noATSS,9,5,151,PROVED
+q -> (p | q),ATSS,3,2,194,PROVED
+q -> (p | q),noATSS,3,2,234,PROVED
+(p & q) -> q,ATSS,3,2,52,PROVED
+(p & q) -> q,noATSS,3,2,58,PROVED
+(p <-> q) -> (q <-> p),ATSS,7,4,944,PROVED
+(p <-> q) -> (q <-> p),noATSS,7,4,1028,PROVED
+((p -> q) & (q -> r)) -> (p -> r),ATSS,4,3,629,PROVED
+((p -> q) & (q -> r)) -> (p -> r),noATSS,4,3,775,PROVED

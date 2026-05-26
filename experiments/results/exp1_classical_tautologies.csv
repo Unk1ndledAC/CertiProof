@@ -1,0 +1,31 @@
+formula,size,depth,time_us,status
+p -> p,2,1,36,PROVED
+p -> p,2,1,43,PROVED
+(p & q) -> p,3,2,51,PROVED
+(p & q) -> p,3,2,53,PROVED
+p -> (p | q),3,2,62,PROVED
+p -> (p | q),3,2,69,PROVED
+(p -> q) -> (q -> r) -> (p -> r),8,5,154,PROVED
+(p -> q) -> (q -> r) -> (p -> r),8,5,170,PROVED
+p -> (q -> p),3,2,60,PROVED
+p -> (q -> p),3,2,74,PROVED
+p | ~p,2,1,404,PROVED
+p | ~p,2,1,492,PROVED
+~(p & ~p),3,2,281,PROVED
+~(p & ~p),3,2,357,PROVED
+(p -> q) -> (~q -> ~p),5,4,469,PROVED
+(p -> q) -> (~q -> ~p),5,4,502,PROVED
+(~p -> ~q) -> (q -> p),4,3,507,PROVED
+(~p -> ~q) -> (q -> p),4,3,585,PROVED
+((p | q) & ~p) -> q,3,2,472,PROVED
+((p | q) & ~p) -> q,3,2,499,PROVED
+(p -> q) -> ((p -> ~q) -> ~p),9,5,130,PROVED
+(p -> q) -> ((p -> ~q) -> ~p),9,5,143,PROVED
+q -> (p | q),3,2,194,PROVED
+q -> (p | q),3,2,228,PROVED
+(p & q) -> q,3,2,52,PROVED
+(p & q) -> q,3,2,54,PROVED
+(p <-> q) -> (q <-> p),7,4,944,PROVED
+(p <-> q) -> (q <-> p),7,4,1038,PROVED
+((p -> q) & (q -> r)) -> (p -> r),4,3,629,PROVED
+((p -> q) & (q -> r)) -> (p -> r),4,3,762,PROVED

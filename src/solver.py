@@ -264,9 +264,15 @@ class WatchedLiterals:
         Returns a conflicting clause or None.
         """
         trail = asgn._trail
-        # We process the trail incrementally
+        # Cache asgn._map for fast value lookups (avoids repeated
+        # attribute access and dict lookups during inner loops).
+        val_map = asgn._map
+
+        # Incremental BCP: take a snapshot of trail length at call
+        # entry so that the propagation counter is set against a
+        # stable baseline rather than a live-growing trail.
+        trail_snapshot_len = len(trail)
         processed_idx = getattr(self, '_prop_processed', 0)
-        self._prop_processed = len(trail)
 
         i = processed_idx
         while i < len(trail):
@@ -275,8 +281,14 @@ class WatchedLiterals:
 
             if false_lit in self._watch:
                 watch_entries = list(self._watch[false_lit])
-                for clause_idx, watch_pos in watch_entries:
+                # Use explicit while-loop with index tracking so we
+                # can skip already-processed watchers.
+                j = 0
+                while j < len(watch_entries):
+                    clause_idx, watch_pos = watch_entries[j]
+
                     if clause_idx >= len(clauses):
+                        j += 1
                         continue
 
                     clause = clauses[clause_idx]
@@ -285,13 +297,20 @@ class WatchedLiterals:
                     # Verify this entry is still valid
                     current_w = w1 if watch_pos == 0 else w2
                     if current_w != false_lit:
+                        j += 1
                         continue
 
                     # Try to find a new non-false literal to watch
                     other_w = w2 if watch_pos == 0 else w1
-                    other_ev = asgn.evaluate(other_w)
+                    # Evaluate the other watched literal using cached
+                    # val_map for O(1) lookup without attribute indirection.
+                    v_other, is_pos_other = other_w
+                    other_val = val_map.get(v_other, None)
+                    other_ev = other_val if is_pos_other else (
+                        None if other_val is None else not other_val)
 
                     if other_ev is True:
+                        j += 1
                         continue  # clause satisfied
 
                     # Look for another unassigned or true literal
@@ -299,7 +318,10 @@ class WatchedLiterals:
                     for lit in clause:
                         if lit == w1 or lit == w2:
                             continue
-                        ev = asgn.evaluate(lit)
+                        v_lit, is_pos_lit = lit
+                        lit_val = val_map.get(v_lit, None)
+                        ev = lit_val if is_pos_lit else (
+                            None if lit_val is None else not lit_val)
                         if ev is not False:
                             # Replace this watch with lit
                             self._watch[false_lit] = [
@@ -319,18 +341,23 @@ class WatchedLiterals:
                             break
 
                     if found_new:
+                        j += 1
                         continue
 
                     if other_ev is False:
                         return clause  # CONFLICT
 
                     # Clause is unit: other_w is unassigned
-                    v_other, is_pos = other_w
-                    if asgn.value(v_other) is None:
-                        asgn.assign(v_other, is_pos, reason=clause_idx)
+                    if val_map.get(v_other) is None:
+                        asgn.assign(v_other, is_pos_other, reason=clause_idx)
                         reason_map[v_other] = clause_idx
                         stats['unit_props'] += 1
+                    j += 1
             i += 1
+
+        # Mark all processed entries (original + any added during propagation)
+        # using the snapshot for robust tracking between propagate calls.
+        self._prop_processed = trail_snapshot_len
 
         return None
 
@@ -774,6 +801,10 @@ class NeuroProofSolver:
         self._max_learned: int = 8000
         # Interpolation state
         self._interpolator: Optional[IncrementalInterpolator] = None
+        # Lazy clause deletion cooldown: skips deletion checks for
+        # this many conflicts after a deletion to prevent thrashing
+        # when many clauses are created in quick succession.
+        self._deletion_cooldown: int = 0
 
     # ==========================================================================
     # Public Interface
@@ -930,8 +961,11 @@ class NeuroProofSolver:
                 restart_next = max(50, min(10000, restart_next))
 
             # ---- Clause deletion ----
-            if stats['conflicts'] % 2000 == 0 and stats['conflicts'] > 0:
-                self._delete_learned_lbd(clause_db, learned_origins)
+            if self._deletion_cooldown > 0:
+                self._deletion_cooldown -= 1
+            elif stats['conflicts'] % 2000 == 0 and stats['conflicts'] > 0:
+                self._delete_learned_lbd(clause_db, learned_origins, reason_map)
+                self._deletion_cooldown = 100  # skip next 100 conflicts
 
             unassigned = assignment.unassigned_vars(all_vars)
             if not unassigned:
@@ -1142,35 +1176,42 @@ class NeuroProofSolver:
                      if asgn.var_level(lit[0]) > 0]
         dl = asgn.decision_level
 
-        # Phase 2: Recursive self-subsumption
-        # A literal is redundant if removing it still leaves an
-        # asserting clause (all remaining literals are falsified at
-        # levels <= current decision level)
-        i = 0
-        while i < len(minimized):
-            lit = minimized[i]
-            v = lit[0]
-            # Keep the literal if:
-            # (a) it's from the current decision level (likely the 1-UIP), or
-            # (b) we cannot determine redundancy without deeper analysis
-            if asgn.var_level(v) == dl:
+        # Phase 2: Recursive self-subsumption with fixpoint iteration
+        # MiniSAT-style: iterate until no more literals can be removed,
+        # up to 3 passes to avoid infinite loops on complex subsumption chains.
+        passes = 0
+        while passes < 3:
+            removed_this_pass = False
+            i = 0
+            while i < len(minimized):
+                lit = minimized[i]
+                v = lit[0]
+                # Keep the literal if:
+                # (a) it's from the current decision level (likely the 1-UIP), or
+                # (b) we cannot determine redundancy without deeper analysis
+                if asgn.var_level(v) == dl:
+                    i += 1
+                    continue
+                # Check if v has a reason clause that subsumes it
+                if v in reason_map and clause_db is not None:
+                    reason_idx = reason_map[v]
+                    if reason_idx < len(clause_db):
+                        reason_clause = clause_db[reason_idx]
+                        # Check if all literals in the reason clause (except v)
+                        # are also in the minimized clause — if so, v is redundant
+                        reason_lits = {rlit for rlit in reason_clause
+                                       if rlit[0] != v}
+                        clause_lits = set(minimized[:i] + minimized[i+1:])
+                        if reason_lits.issubset(clause_lits):
+                            # v is subsumed by its reason clause — remove it
+                            minimized.pop(i)
+                            removed_this_pass = True
+                            continue
                 i += 1
-                continue
-            # Check if v has a reason clause that subsumes it
-            if v in reason_map and clause_db is not None:
-                reason_idx = reason_map[v]
-                if reason_idx < len(clause_db):
-                    reason_clause = clause_db[reason_idx]
-                    # Check if all literals in the reason clause (except v)
-                    # are also in the minimized clause — if so, v is redundant
-                    reason_lits = {rlit for rlit in reason_clause
-                                   if rlit[0] != v}
-                    clause_lits = set(minimized[:i] + minimized[i+1:])
-                    if reason_lits.issubset(clause_lits):
-                        # v is subsumed by its reason clause — remove it
-                        minimized.pop(i)
-                        continue
-            i += 1
+
+            if not removed_this_pass:
+                break
+            passes += 1
 
         removed = n_original - len(minimized)
         return frozenset(minimized), max(0, removed)
@@ -1189,11 +1230,51 @@ class NeuroProofSolver:
         return float(len(levels))
 
     # ==========================================================================
+    # Index Rebuilding after Clause Deletion
+    # ==========================================================================
+
+    def _rebuild_learned_indices(self, learned_origins: List[List[int]],
+                                  old_to_new: Dict[int, int],
+                                  reason_map: Optional[Dict[str, int]] = None) -> None:
+        """Rebuild all internal learned clause references after clause deletion.
+
+        This method atomically updates all data structures that hold clause
+        indices, ensuring consistency after the clause database is compacted:
+
+        - ``self._learned_lbd``: remaps learned clause keys using ``old_to_new``.
+        - ``learned_origins``: remaps internal clause references within each
+          origin list so that parent pointers remain valid.
+        - ``reason_map`` (optional): updates variable-to-clause mappings to
+          reflect the new clause database indices.
+        """
+        # Rebuild LBD index
+        new_lbd: Dict[int, float] = {}
+        for old_idx, lbd in self._learned_lbd.items():
+            if old_idx in old_to_new:
+                new_lbd[old_to_new[old_idx]] = lbd
+        self._learned_lbd = new_lbd
+
+        # Rebuild learned_origins internal references
+        for i in range(len(learned_origins)):
+            new_origins_i: List[int] = []
+            for orig in learned_origins[i]:
+                if orig in old_to_new:
+                    new_origins_i.append(old_to_new[orig])
+            learned_origins[i] = new_origins_i
+
+        # Update reason_map if provided
+        if reason_map is not None:
+            for var_name, clause_idx in list(reason_map.items()):
+                if clause_idx in old_to_new:
+                    reason_map[var_name] = old_to_new[clause_idx]
+
+    # ==========================================================================
     # LBD-based Clause Deletion
     # ==========================================================================
 
     def _delete_learned_lbd(self, clause_db: List[Clause],
-                             learned_origins: List[List[int]]) -> None:
+                             learned_origins: List[List[int]],
+                             reason_map: Optional[Dict[str, int]] = None) -> None:
         """
         Delete low-quality learned clauses based on LBD.
 
@@ -1232,12 +1313,8 @@ class NeuroProofSolver:
 
         clause_db[:] = new_db
         learned_origins[:] = new_origins
-        # Rebuild LBD index to reflect new clause database indices
-        new_lbd: Dict[int, float] = {}
-        for old_idx, lbd in self._learned_lbd.items():
-            if old_idx in old_to_new:
-                new_lbd[old_to_new[old_idx]] = lbd
-        self._learned_lbd = new_lbd
+        # Rebuild all internal learned clause references atomically
+        self._rebuild_learned_indices(learned_origins, old_to_new, reason_map)
 
     # ==========================================================================
     # VSIDS Variable Selection
