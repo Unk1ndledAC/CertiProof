@@ -227,6 +227,44 @@ Our four main contributions are:
     3-CNF phase transition, and neural tactic selection.
 \end{enumerate}
 
+\begin{figure}[t]
+  \centering
+  \begin{tikzpicture}[
+    node distance=0.9cm and 1.1cm,
+    box/.style={draw, rounded corners=3pt, minimum width=2.4cm,
+                minimum height=0.7cm, align=center, font=\footnotesize},
+    arrow/.style={-{Stealth[scale=0.8]}, thick}
+  ]
+    % Top layer: ATSS
+    \node[box, fill=blue!12] (atss)
+      {\textbf{ATSS}\\EXP3 Bandit};
+    % Middle layer: Core
+    \node[box, fill=green!12, below=0.6cm of atss] (core)
+      {\textbf{Hybrid Calculus}\\ND + SC + Res};
+    \node[box, fill=orange!12, right=of core] (interp)
+      {\textbf{Craig Interp.}\\Pudl\'{a}k algo};
+    % Bottom layer: Verification
+    \node[box, fill=red!12, below=0.6cm of core] (rocq)
+      {\textbf{Rocq Kernel}\\Soundness + Compl.};
+    \node[box, fill=gray!12, right=of rocq] (tcb)
+      {\textbf{Python TCB}\\Rule checker};
+
+    % Arrows
+    \draw[arrow] (atss) -- node[right,font=\tiny]{tactic} (core);
+    \draw[arrow] (core) -- node[above,font=\tiny]{conflict} (interp);
+    \draw[arrow] (interp) |- node[right,font=\tiny,pos=0.4]{lemmas} (atss);
+    \draw[arrow] (core) -- node[left,font=\tiny]{proof steps} (rocq);
+    \draw[arrow] (rocq) -- node[above,font=\tiny]{verify} (tcb);
+    \draw[arrow, bend right=25] (tcb.north) to
+      node[right,font=\tiny,pos=0.6]{OK} (core.east);
+  \end{tikzpicture}
+  \caption{Architecture of \NP{}.  \ATSS{} selects tactics for the
+    hybrid calculus; conflict clauses feed Craig interpolation, which
+    populates the ATSS lemma table.  Proof steps are verified through
+    the dual Python/Rocq chain.}
+  \label{fig:architecture}
+\end{figure}
+
 \paragraph{Paper organisation.}
 \Cref{sec:background} reviews background.
 \Cref{sec:system} defines the \NP{} proof calculus.
@@ -353,6 +391,26 @@ criterion~\cite{Harrison2009}.  Nordstr\"{o}m~\cite{NordstromProofComplexity2025
 provides a contemporary survey connecting proof complexity to modern
 SAT solving, reinforcing the relevance of our complexity-theoretic
 analysis.
+
+\paragraph{Distinction from bandit and RL methods in ATP.}
+Reinforcement learning and bandit-style methods have been applied
+to tactic selection in interactive theorem provers, including
+k-nearest-neighbor based tactic recommenders that learn from accumulated
+proof corpora, and Monte Carlo tree search with learned value functions
+for proof exploration.  \ATSS{} differs from these approaches in three
+critical aspects.  \textbf{First, adversarial vs.~stochastic bandits:}
+prior work typically assumes i.i.d.~or stationary reward distributions
+(stochastic or contextual bandit models), whereas EXP3-ATSS provides
+worst-case regret guarantees under \emph{adversarial} reward sequences
+(\Cref{thm:atss-regret})---a stronger model that does not assume goals
+arrive from a fixed distribution.  \textbf{Second, zero pre-training:}
+unlike corpus-dependent systems, \ATSS{} operates from the first proof
+attempt without any historical data, making it applicable to novel
+formula families on first encounter.  \textbf{Third, domain-specific
+reward:} \ATSS{} uses proof success signals augmented by Craig
+interpolation quality (interpolant coverage, size) as a reward
+channel, creating a feedback mechanism specifically designed for
+proof construction rather than generic action selection.
 
 % ============================================================
 \section{The NeuroProof Proof Calculus}
@@ -834,6 +892,25 @@ creates a DAG edge instead of re-deriving the subproof.
 
 \noindent This theorem is \emph{mechanically verified} in the Rocq
 formalisation (Theorem \texttt{adaptive\_cut\_sound}).
+
+\begin{table}[t]
+  \centering
+  \caption{Summary of \NP{} novel rules.  All rules are
+    soundness-verified in Rocq; rules marked $\dagger$ rely on
+    \ATSS{} for formula selection.}
+  \label{tab:novel-rules}
+  \begin{tabular}{@{}l p{5.2cm} c@{}}
+    \toprule
+    Rule & Role & Verified \\
+    \midrule
+    ADAPTIVE\_CUT & \ATSS-guided analytic cut (subformula-restricted) & $\checkmark$ \\
+    LEMMA\_REUSE & DAG edge for previously proved conclusions & $\checkmark$ \\
+    INTERPOLANT & Craig interpolant as proof decomposer & $\checkmark$ \\
+    LEMMA\_LEARN & CNF conflict clause $\to$ ND lemma lifting & $\checkmark$ \\
+    INTERPOLATION\_GUIDED\_CUT & Interpolant-guided decomposition $\dagger$ & $\checkmark$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 % ============================================================
 \section{EXP3-ATSS: Adversarial Bandit Tactic Synthesis}
@@ -1458,16 +1535,29 @@ kernel and proof builder; the only difference is whether ATSS guides
 tactic selection.
 
 On these simple tautologies, ATSS and noATSS produce
-\emph{similar proof sizes} because the \textsc{solver\_fallback}
-tactic dominates: for formulas with small constant-size proofs,
-the solver subsumes most proof search after a few structural
-tactic attempts.  ATSS provides marginal improvement on deeper
-formulas (e.g., $(p \to q) \to (q \to r) \to (p \to r)$ and
+\emph{nearly identical proof sizes and depths}: of the 15~formulas,
+13 show exactly the same proof structure regardless of ATSS
+participation, and the remaining 2 differ by at most one step.  The
+\textsc{solver\_fallback} tactic dominates because, for formulas
+with small constant-size proofs (2--10 steps), the CDCL kernel
+subsumes most proof search after a few structural tactic attempts.
+ATSS provides marginal improvement on the two deepest formulas
+($(p \to q) \to (q \to r) \to (p \to r)$ and
 $(p \leftrightarrow q) \to (q \leftrightarrow p)$), where
 guidance toward \textsc{IMP\_I} and \textsc{DNE} avoids
-unnecessary backtracking.  We expect ATSS's advantage to grow
-significantly on larger, more structurally complex formulas where
-the fallback tactic alone does not suffice.
+unnecessary backtracking.
+
+We are transparent that this experiment does \emph{not} demonstrate
+a strong empirical advantage for ATSS over the solver fallback on
+classical tautologies.  The limited differentiation is expected on
+this benchmark: these tautologies have small, well-understood proofs
+where the CDCL kernel alone suffices.  A meaningful test of ATSS's
+online learning advantage requires benchmarks where multiple
+non-trivial tactic decisions must be made---specifically, formulas
+with deep structural decompositions (e.g., circuit verification
+conditions, bit-vector equivalences) where \textsc{solver\_fallback}
+alone does not dominate proof construction.  Such evaluation is
+deferred to future work on larger, verification-relevant benchmarks.
 
 \subsection{Experiment 5: Ablation Study \textnormal{(EXP-6)}}
 
@@ -1738,6 +1828,18 @@ capture tactic success patterns than bag-of-subformulas overlap.
     and proof-quality benchmarks (Experiments~1,~4), suggesting that
     the constant factors in our bound are conservative.
 
+  \item \textbf{Limitation: ATSS empirical advantage.}
+    Experiment~4 reveals that ATSS and noATSS produce nearly identical
+    proof structures on classical tautologies, with the CDCL fallback
+    dominating tactic selection.  The expected online learning benefit
+    is therefore \emph{not yet empirically demonstrated} on the
+    current benchmark set.  This is attributable to the benchmark
+    characteristics---classical tautologies admit small, well-understood
+    proofs---rather than a fundamental weakness of the bandit framework,
+    but it represents a gap between the theoretical guarantees and the
+    current empirical evidence that must be addressed through evaluation
+    on more structurally complex benchmarks.
+
   \item \textbf{(T3 --- Proof compression.)}  Our classical
     tautology proofs have sizes 2--7 (median~3), demonstrating that
     the tactic engine finds \emph{near-optimal} proof paths.  The
@@ -1823,59 +1925,114 @@ search, learning, and verification as separate modules.
 \section{Proofs of Main Theorems}
 \label{app:proofs}
 
-\subsection{Proof of Theorem~\ref{thm:atss-regret} (ATSS Convergence)}
+\subsection{Proof of Theorem~\ref{thm:atss-regret} (EXP3 Regret Bound)}
 
-Let $X_1, X_2, \ldots, X_N$ be the sequence of success indicators
-for tactic $t^*$, where $X_j \in \{0,1\}$ with
-$\mathbb{E}[X_j] \geq \mu_{t^*} - \eta$ for some $\eta > 0$
-(locally stationary assumption).  The EMA estimate after $N$ steps
-is normalised:
-\begin{equation}
-  \hat{\mu}^{(N)} = \frac{S^{(N)}}{W^{(N)}},
-\end{equation}
-where
-\begin{align*}
-  S^{(N)} &= \sum_{j=1}^{N} (1{-}\gamma)\,\gamma^{N-j}\,X_j, \\
-  W^{(N)} &= \sum_{j=1}^{N} (1{-}\gamma)\,\gamma^{N-j}
-    = 1 - \gamma^N.
-\end{align*}
+The following is a self-contained proof of the EXP3 regret bound
+(\Cref{thm:atss-regret}), following the potential-function method of
+Auer, Cesa-Bianchi, Freund, and
+Schapire~\cite{AuerCesaBianchiFreundSchapire2002}.
 
-For $N \geq 10$ and $\gamma \leq 0.99$, we have $W^{(N)} \geq 0.9$,
-so the normalisation factor is bounded away from zero.
+\paragraph{Notation.}  Let $K$ be the number of arms (tactics),
+$T$ the horizon, $\gamma \in (0,1]$ the exploration parameter, and
+$\eta = \gamma/K$ the learning rate.  The un-mixed weight distribution
+is $p_t'(i) = w_t(i) / \sum_j w_t(j)$, and the mixed distribution is
+$p_t(i) = (1-\gamma)p_t'(i) + \gamma/K$.
 
-\emph{Step 1: Effective sample size.}
-The weight concentration is:
+\paragraph{Step 1: Bounding $\log(\Phi_{T+1}/\Phi_1)$.}
+Define the potential $\Phi_t = \sum_{i=1}^{K} w_t(i)$ with
+$w_1(i) = 1$ for all $i$.
+The importance-weighted reward estimate is
+$\hat{r}_t(i) = r_t(I_t) \cdot \mathbf{1}[I_t = i] \,/\, p_t(i)$,
+which satisfies $\mathbb{E}_{I_t \sim p_t}[\hat{r}_t(i)] = r_t(i)$.
+The update rule is $w_{t+1}(i) = w_t(i) \cdot \exp(\eta\, \hat{r}_t(i))$.
+
+Using $e^x \le 1 + x + (e-2)x^2$ for $x \le 1$ (valid since
+$\eta\,\hat{r}_t(i) \le \eta / p_t(i) \le \eta K / \gamma = 1$):
+\begin{align}
+  \frac{\Phi_{t+1}}{\Phi_t}
+  &= \sum_{i=1}^{K} \frac{w_t(i)}{\Phi_t}\, e^{\eta \hat{r}_t(i)}
+    \nonumber \\
+  &\le \sum_{i=1}^{K} p_t'(i)\,
+      \bigl(1 + \eta\hat{r}_t(i) + (e-2)\eta^2\hat{r}_t(i)^2\bigr)
+    \nonumber \\
+  &= 1 + \eta\sum_{i=1}^{K} p_t'(i)\hat{r}_t(i)
+      + (e-2)\eta^2\sum_{i=1}^{K} p_t'(i)\hat{r}_t(i)^2.
+    \label{eq:exp3-phi-ratio}
+\end{align}
+
+Now $p_t'(i) \le p_t(i)/(1-\gamma)$, so
+$p_t'(i)\hat{r}_t(i)^2 \le p_t(i)\hat{r}_t(i)^2/(1-\gamma)
+  = r_t(I_t)\hat{r}_t(i)/(1-\gamma)$.
+Since $\hat{r}_t(i) \ge 0$, we take $\log$ of both sides,
+apply $\log(1+x) \le x$, sum over $t=1,\dots,T$, and take expectations:
+\begin{align}
+  \mathbb{E}[\log\Phi_{T+1}]
+  &\le \log K \;+\;
+     \frac{\eta}{1-\gamma} \sum_{t=1}^{T} \mathbb{E}\bigl[
+       \textstyle\sum_i p_t'(i)\hat{r}_t(i)
+     \bigr] \nonumber \\
+  &\qquad\;+\; \frac{(e-2)\eta^2}{1-\gamma} \sum_{t=1}^{T}
+     \mathbb{E}\bigl[r_t(I_t)\textstyle\sum_i \hat{r}_t(i)\bigr].
+  \label{eq:exp3-log-phi}
+\end{align}
+
+\paragraph{Step 2: Lower bound via best arm.}
+For any fixed arm $j$,
 \[
-  \sum_{j=1}^{N} w_j^2
-  = (1{-}\gamma)^2 \sum_{j=1}^{N} \gamma^{2(N-j)}
-  \leq \frac{(1{-}\gamma)^2}{1 - \gamma^2}
-  = \frac{1-\gamma}{1+\gamma}
-  \leq \frac{1-\gamma}{2}.
+  \log\Phi_{T+1}
+  \ge \log w_{T+1}(j)
+  = \eta\sum_{t=1}^{T} \hat{r}_t(j).
 \]
-Hence the effective sample size satisfies
-$n_{\mathrm{eff}} = \frac{(W^{(N)})^2}{\sum w_j^2}
-  \geq \frac{2}{1-\gamma}$.
-
-\emph{Step 2: Weighted Hoeffding bound (non-i.i.d.\ version).}
-The weighted Hoeffding inequality requires only bounded support
-$X_j \in [0,1]$, not independence.  We have:
+Taking expectations and noting
+$\mathbb{E}[\hat{r}_t(j)] = r_t(j)$:
 \[
-  \Pr\!\bigl[\hat{\mu}^{(N)} - \bar{\mu} < -\varepsilon\bigr]
-  \leq \exp\!\Bigl(-2\varepsilon^2 \cdot n_{\mathrm{eff}}\Bigr)
-  \leq \exp\!\Bigl(\frac{-4\varepsilon^2}{1-\gamma}\Bigr),
+  \mathbb{E}[\log\Phi_{T+1}]
+  \ge \eta\sum_{t=1}^{T} r_t(j).
 \]
-where $\bar{\mu} = \sum w_j \mathbb{E}[X_j] / W^{(N)}
-  \geq \mu_{t^*} - \eta$.
+Since this holds for every $j$, it holds for
+$j^* = \argmax_j \sum_t r_t(j)$.
 
-\emph{Step 3: Union bound.}
-\[
-  k \cdot \exp\!\Bigl(\frac{-4\varepsilon^2}{1-\gamma}\Bigr)
-  \leq \delta
-  \;\;\Longrightarrow\;\;
-  \boxed{N \geq
-    \frac{k \ln(k/\delta)}{4\varepsilon^2(1-\gamma)}.}
-\]
-\hfill$\blacksquare$
+\paragraph{Step 3: Assembling the bound.}
+Combining the upper and lower bounds on $\mathbb{E}[\log\Phi_{T+1}]$
+and simplifying the estimates
+$\mathbb{E}[\sum_i p_t'(i)\hat{r}_t(i)] \le \mathbb{E}[r_t(I_t)]/(1-\gamma)$
+and
+$\mathbb{E}[r_t(I_t)\sum_i \hat{r}_t(i)] \le K$:
+\begin{align}
+  \eta\sum_{t=1}^{T} r_t(j^*)
+  &\le \log K
+     + \frac{\eta}{1-\gamma} \sum_{t=1}^{T}
+       \frac{\mathbb{E}[r_t(I_t)]}{1-\gamma}
+     + \frac{(e-2)\eta^2 K T}{1-\gamma}.
+\end{align}
+
+Let $G_{\max} = \sum_{t=1}^{T} r_t(j^*)$ and
+$G_{\textsc{EXP3}} = \mathbb{E}[\sum_{t=1}^{T} r_t(I_t)]$.
+Rearranging, with $\eta = \gamma/K$ and $\gamma \le 1/2$ (so
+$1/(1-\gamma)^2 \le 4$):
+\begin{align}
+  G_{\max} - G_{\textsc{EXP3}}
+  &\le \frac{K\log K}{\gamma}
+     + (e-2)\gamma T
+     + \frac{4\gamma}{K} G_{\textsc{EXP3}} \nonumber \\
+  &\le \frac{K\log K}{\gamma}
+     + (e-2)\gamma T + 4\gamma T,
+  \label{eq:exp3-bound-intermediate}
+\end{align}
+since $G_{\textsc{EXP3}} \le KT$ (each round's reward bounded by $K$).
+
+\paragraph{Step 4: Optimal tuning.}
+Choose $\gamma = \min\{1, \sqrt{K\ln K / ((e-1)T)}\}$.
+For $T \ge K\ln K/(e-1)$, this gives $\gamma \le 1$ and:
+\begin{align}
+  G_{\max} - G_{\textsc{EXP3}}
+  &\le \frac{K\log K}{\sqrt{K\ln K/((e-1)T)}}
+     + (e-1)\sqrt{\frac{K\ln K}{(e-1)T}} \cdot T \nonumber \\
+  &= 2\sqrt{(e-1)KT\ln K}.
+\end{align}
+The additive $O(\ln K)$ term in the theorem statement arises from
+the edge case $T < K\ln K/(e-1)$ where $\gamma=1$ and the regret is
+trivially bounded by $KT + \ln K \le 2K\ln K$.  $\hfill\square$
 
 \subsection{Full Rule Set}
 
