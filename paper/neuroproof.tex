@@ -120,10 +120,11 @@ cut rule that uses Craig interpolants to decompose proof goals into
 semantically meaningful subgoals.
 
 The entire proof calculus is \emph{sound} for classical propositional
-logic, with the soundness theorem mechanically verified in Rocq~8.19,
+logic, with the soundness theorem mechanically verified in Rocq~9.0,
 and p-simulates Frege (hence complete). Experimentally, \NP{} proves
-all 15~classical tautologies in under 3\,ms each, matches MiniSAT on
-SATLIB~uf50 benchmarks, and correctly reports the exponential
+all 15~classical tautologies in 2--10~steps, demonstrates correct
+proof certification across the full easy--hard--easy spectrum of
+random 3-CNF, and correctly reports the exponential
 resolution lower bound on $\PHP_n^{n+1}$ for $n \ge 3$.
 \end{abstract}
 
@@ -208,21 +209,22 @@ arbitrary ones.  Both rules are proven sound and implemented in
 our open-source system.
 
 \paragraph{Contributions at a glance.}
+Our four main contributions are:
 \begin{enumerate}
   \item A \emph{hybrid proof calculus} unifying natural deduction,
-    sequent calculus, and resolution with five novel rules
+    sequent calculus, and resolution with five novel inference rules
     (\textsc{Adaptive\_Cut}, \textsc{Interpolant},
     \textsc{Lemma\_Reuse}, \textsc{Lemma\_Learn},
     \textsc{Interpolation\_Guided\_Cut}).
   \item \emph{EXP3-ATSS}, an adversarial-bandit framework for
-    tactic selection with provable regret bounds under non-i.i.d.\
-    formula streams (\Cref{thm:atss-regret}).
+    adaptive tactic selection with provable regret bounds under
+    non-i.i.d.\ formula streams (\Cref{thm:atss-regret}).
   \item A \emph{p-simulation} argument showing \NP{} simulates Frege
-    (\Cref{thm:completeness}).
-  \item A \emph{mechanically verified soundness proof} in Rocq
-    (\texttt{soundness} theorem).
-  \item An \emph{open-source implementation} evaluated on classical
-    tautologies, SATLIB benchmarks, and the pigeonhole principle family.
+    (\Cref{thm:completeness}), with both soundness and syntactic
+    completeness mechanically verified in Rocq.
+  \item An \emph{open-source implementation} evaluated across eight
+    benchmarks: classical tautologies, pigeonhole principles, random
+    3-CNF phase transition, and neural tactic selection.
 \end{enumerate}
 
 \paragraph{Paper organisation.}
@@ -1185,8 +1187,27 @@ Resolution on pivot variable $x$ propagates the interpolant:
 \section{Rocq/Coq Formalisation}
 \label{sec:rocq}
 
-The \NP{} kernel is formalised in Rocq/Coq~8.19+.
-The formalisation provides:
+The \NP{} kernel is formalised in Rocq~9.0 (1171~lines, compiled
+with \texttt{coqc}~9.0).  The formalisation provides two complementary
+completeness arguments:
+
+\begin{itemize}
+  \item \textbf{p-Simulation} (\Cref{thm:completeness}): proved on
+    paper via a three-step translation (Frege $\to$ ND $\to$ sequent
+    calculus $\to$ \NP{}).  This argument guarantees
+    \emph{polynomial-size} proofs for every tautology but has not
+    yet been fully mechanised in Rocq due to the technical complexity
+    of formalising substitution-based simulation arguments.
+  \item \textbf{Syntactic Completeness (K\'{a}lm\'{a}r)}: fully
+    mechanised in Rocq via K\'{a}lm\'{a}r's constructive method.
+    The proof constructs signed-literal ND derivations for each
+    valuation over the formula's variables, then eliminates variables
+    via excluded middle and $\lor$-elimination.  This provides an
+    \emph{existence} guarantee (every tautology has an ND proof from
+    the empty context) without a polynomial-size bound.
+\end{itemize}
+
+The formalisation additionally provides:
 
 \begin{itemize}
   \item \textbf{Formula AST} (\texttt{Inductive Formula}): eight
@@ -1224,9 +1245,12 @@ Proof. intros v p q Hpq Hp. exact (Hpq Hp). Qed.
 \end{itemize}
 
 \begin{remark}[Verification effort]
-  The Rocq formalisation compiles in under 2~seconds under \texttt{coqc}~8.19.  No
-  axioms beyond classical logic (\texttt{Require Import Classical})
-  and the Craig interpolation axiom are used.
+  The Rocq formalisation compiles under \texttt{coqc}~9.0 in under
+  60~seconds (1171~lines, 0~admitted proofs).  All 17~ND rules, the
+  soundness theorem, and the K\'{a}lm\'{a}r-based syntactic completeness
+  theorem are fully proved.  The only axiom used beyond classical logic
+  is the Craig interpolation existence axiom; the interpolation
+  construction itself is delegated to the Python implementation.
 \end{remark}
 
 % ============================================================
@@ -1334,22 +1358,23 @@ with \ATSS{} enabled.  Key observations:
   \caption{Pigeonhole Principle $\PHP_n^{n+1}$: solve statistics.
    DPLL returns UNSAT for all instances.  \NP{} returns UNKNOWN
    (conflict limit reached) for $n \geq 3$, as expected from
-   the exponential resolution lower bound.}
+   the exponential resolution lower bound.  Times are approximate;
+   re-measurement with consistent hardware is planned.}
   \label{tab:pigeonhole}
   \begin{tabular}{@{}crrccc@{}}
     \toprule
     $n$ & \multicolumn{1}{c}{\#Vars}
         & \multicolumn{1}{c}{\#Clauses}
-        & \multicolumn{2}{c}{Time (s)}
+        & \multicolumn{2}{c}{Time}
         & Status \\
     \cmidrule(lr){4-5}
          & & & \NP{} & DPLL & \\
     \midrule
-    2 &   6 &   12 & 13.3 & ${<}0.001$ & UNSAT \\
-    3 &  12 &   34 & 14.9 & ${<}0.001$ & UNSAT/UNKNOWN \\
-    4 &  20 &   75 & 16.5 &  0.002 & UNSAT/UNKNOWN \\
-    5 &  30 &  141 & 18.1 &  0.024 & UNSAT/UNKNOWN \\
-    6 &  42 &  238 & 19.8 &  0.233 & UNSAT/UNKNOWN \\
+    2 &   6 &   12 & $<$1\,s & ${<}0.001$\,s & UNSAT \\
+    3 &  12 &   34 & $\sim$8\,s & ${<}0.001$\,s & UNKNOWN \\
+    4 &  20 &   75 & $\sim$10\,s &  0.002\,s & UNKNOWN \\
+    5 &  30 &  141 & $\sim$12\,s &  0.024\,s & UNKNOWN \\
+    6 &  42 &  238 & $\sim$16\,s &  0.233\,s & UNKNOWN \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -1404,7 +1429,7 @@ solver configuration with a 60-second timeout.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{figures/fig_phase_transition.pdf}
-  \caption{Phase transition in random 3-CNF ($n=50$, 50 trials
+  \caption{Phase transition in random 3-CNF ($n=20$, 10 trials
     per ratio).  All solvers exhibit the characteristic threshold
     around $\alpha \approx 4.27$.  Glucose4 dominates on UNSAT
     instances; \NP{}+\ATSS{} performs comparably on SAT instances.}
@@ -1457,7 +1482,7 @@ solved by all three configurations with a 60-second timeout.
 \begin{table}[t]
   \centering
   \caption{Ablation study across difficulty levels
-    ($n=50$, 50 trials per level, 60\,s timeout).
+    ($n=20$, 10 trials per level, 60\,s timeout).
     Solve rate = fraction of formulas solved within timeout.}
   \label{tab:ablation}
   \begin{tabular}{@{}ll rrr@{}}
@@ -1516,7 +1541,7 @@ generated and solved (60\,s timeout).
   \centering
   \includegraphics[width=\linewidth]{figures/fig_scalability.pdf}
   \caption{Scalability of solve time with number of variables
-    ($\alpha=4.3$, 30 trials per point, 60\,s timeout).  Shaded
+    ($\alpha=4.3$, 10 trials per point, 60\,s timeout).  Shaded
     regions indicate interquartile range.  \NP{}+\ATSS{} and
     DPLL-Baseline exhibit steep growth beyond $n \approx 30$;
     Glucose4 scales more gracefully due to restart policies.}
@@ -1571,7 +1596,7 @@ family and random 3-CNF instances
   \centering
   \small
   \caption{Quantitative SOTA comparison on PHP$_n^{n+1}$ and random
-    3-CNF ($n=50$, $\alpha=4.0$, 5 trials per ratio).
+    3-CNF ($n=20$, $\alpha=4.0$, 5 trials per ratio).
     ``---'' = not applicable; all times are median.}
   \label{tab:sota-quantitative}
   \begin{tabular}{@{}ll rrc@{}}
@@ -1683,11 +1708,14 @@ As expected, Cosine-ATSS achieves competitive speed due to
 its negligible computational overhead.  GNN-ATSS is slowest due to
 GPU transfer and inference latency, which dominates the proof search
 time for these small formulas.  Blended-ATSS achieves the fastest
-per-proof time by combining lightweight cosine filtering with
-selective GNN invocation.  While GNN-ATSS does not improve raw
-performance on this benchmark, we anticipate structural advantages
-on larger formulas where graph embeddings better capture tactic
-success patterns than bag-of-subformulas overlap.
+per-proof time because it relies primarily on the cosine-similarity
+path; the GNN is invoked only as a tie-breaker when cosine scores
+are nearly equal, a rare occurrence on these small formulas.  This
+makes Blended-ATSS behaviourally close to Cosine-ATSS in this
+regime, with the small measured speedup attributable to measurement
+noise on sub-millisecond timings.  We anticipate structural advantages
+of the GNN component on larger formulas where graph embeddings better
+capture tactic success patterns than bag-of-subformulas overlap.
 
 \subsection{Discussion and Limitations}
 

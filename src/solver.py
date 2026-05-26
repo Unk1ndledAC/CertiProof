@@ -48,8 +48,9 @@ from __future__ import annotations
 import time
 import math
 import hashlib
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import (Dict, FrozenSet, List, Optional, Set, Tuple)
+from typing import (Any, Dict, FrozenSet, List, Optional, Set, Tuple)
 from enum import Enum, auto
 from collections import deque
 
@@ -338,10 +339,58 @@ class WatchedLiterals:
 
 
 # ==============================================================================
+# Unified Tactical Selector Interface
+# ==============================================================================
+
+class TacticalSelector(ABC):
+    """
+    Abstract interface for tactic selection strategies.
+
+    Both EXP3-ATSS (adversarial bandit) and GNN-ATSS (graph neural network)
+    implement this interface, allowing the CDCL solver and proof engine to
+    use either backend transparently.  The interface covers:
+
+      - Tactic sampling and online weight updates (bandit methods)
+      - Lemma storage and retrieval (proof reuse)
+      - Formula scoring (heuristic guidance)
+    """
+
+    @abstractmethod
+    def sample_tactic(self) -> int:
+        """Sample a tactic index from the current selection distribution."""
+        ...
+
+    @abstractmethod
+    def update(self, chosen: int, reward: float) -> None:
+        """Update selection weights after observing reward for chosen tactic."""
+        ...
+
+    @abstractmethod
+    def get_probability_distribution(self) -> List[float]:
+        """Return the current probability distribution over all tactics."""
+        ...
+
+    @abstractmethod
+    def store_lemma(self, step: ProofStep) -> None:
+        """Store a proved step in the lemma store for future reuse."""
+        ...
+
+    @abstractmethod
+    def lookup_lemma(self, f: Formula) -> Optional[ProofStep]:
+        """Look up a previously stored lemma by its conclusion formula."""
+        ...
+
+    @abstractmethod
+    def score(self, f: Formula) -> float:
+        """Return a heuristic score for a formula (higher = more likely provable)."""
+        ...
+
+
+# ==============================================================================
 # EXP3-ATSS: Adversarial Bandit Tactic Synthesis
 # ==============================================================================
 
-class EXP3ATSS:
+class EXP3ATSS(TacticalSelector):
     """
     EXP3-based Adaptive Tactic Synthesis System.
 
@@ -473,6 +522,70 @@ class EXP3ATSS:
 
 
 # ==============================================================================
+# GNN-ATSS Adapter (bridges atss_gnn.py → TacticalSelector interface)
+# ==============================================================================
+
+class GNNATSSAdapter(TacticalSelector):
+    """
+    Adapts the GNN-based ATSS (atss_gnn.GNNATSS) to the TacticalSelector
+    interface used by the CDCL solver.
+
+    Since GNN-ATSS works with formula graphs and named tactics while the
+    solver uses tactic indices and formula-level scoring, this adapter:
+      - Maps tactic indices ↔ tactic names
+      - Falls back to EXP3 bandit for online sampling (GNN provides scores)
+      - Delegates lemma storage to an internal EXP3ATSS instance
+    """
+
+    def __init__(self, gnn_atss: Any = None, tactic_names: Optional[List[str]] = None,
+                 n_tactics: int = 8) -> None:
+        self._gnn = gnn_atss  # GNNATSS instance (optional)
+        self._tactic_names = tactic_names or [f"tactic_{i}" for i in range(n_tactics)]
+        self._K = len(self._tactic_names)
+        # Fallback EXP3 bandit for online sampling when GNN is unavailable
+        self._fallback = EXP3ATSS(n_tactics=self._K)
+        # Lemma store (shared with fallback EXP3)
+        self._lemma_store: Dict[int, ProofStep] = self._fallback._lemma_store
+
+    def sample_tactic(self) -> int:
+        """Sample using GNN scores (when available) or fallback EXP3."""
+        if self._gnn is not None:
+            # Use GNN scores as softmax probabilities
+            import random
+            probs = self.get_probability_distribution()
+            r = random.random()
+            cumsum = 0.0
+            for i, p in enumerate(probs):
+                cumsum += p
+                if r < cumsum:
+                    return i
+        return self._fallback.sample_tactic()
+
+    def update(self, chosen: int, reward: float) -> None:
+        """Update both GNN (if available) and fallback EXP3."""
+        self._fallback.update(chosen, reward)
+        # GNN update is deferred to the caller (needs formula_graph)
+
+    def get_probability_distribution(self) -> List[float]:
+        """Return distribution from GNN (softmax) or fallback EXP3."""
+        if self._gnn is not None and hasattr(self._gnn, '_last_scores'):
+            scores = list(self._gnn._last_scores.values())
+            if scores:
+                total = sum(scores) + 1e-12
+                return [s / total for s in scores]
+        return self._fallback.get_probability_distribution()
+
+    def store_lemma(self, step: ProofStep) -> None:
+        self._fallback.store_lemma(step)
+
+    def lookup_lemma(self, f: Formula) -> Optional[ProofStep]:
+        return self._fallback.lookup_lemma(f)
+
+    def score(self, f: Formula) -> float:
+        return self._fallback.score(f)
+
+
+# ==============================================================================
 # Incremental Craig Interpolation
 # ==============================================================================
 
@@ -525,34 +638,64 @@ class IncrementalInterpolator:
             return
 
         # Find the pivot literal from origins
-        itp = None
-        for orig_idx in origins:
-            if orig_idx in self._partial_itps:
-                if itp is None:
-                    itp = self._partial_itps[orig_idx]
-                else:
-                    # Resolution: determine pivot and apply Pudlák rule
-                    pivot_vars = self._find_pivot(origins, clause)
-                    if pivot_vars:
-                        # Check if pivot is shared
-                        shared_pivot = any(v in self._common for v in pivot_vars)
-                        if shared_pivot or self._source.get(orig_idx, 'A') in ('A', 'AB'):
-                            itp = Or(itp, self._partial_itps[orig_idx])
-                        else:
-                            itp = And(itp, self._partial_itps[orig_idx])
-                    else:
-                        itp = Or(itp, self._partial_itps[orig_idx])
+        # Get the parent clauses for the resolution chain
+        parent_clauses = [
+            orig_idx for orig_idx in origins
+            if orig_idx in self._partial_itps
+        ]
+        if not parent_clauses:
+            self._source[clause_idx] = 'AB'
+            self._partial_itps[clause_idx] = Top
+            return
+
+        # Apply Pudlák interpolation rule iteratively
+        # For resolution of C₁∨p and C₂∨¬p:
+        #   p shared (A∩B): I = I₁ ∨ I₂
+        #   p local to A:  I = I₁ ∨ I₂ (standard resolution combinator)
+        #   p local to B:  I = I₁ ∧ I₂ (combine-pivot combinator)
+        itp = self._partial_itps[parent_clauses[0]]
+        for orig_idx in parent_clauses[1:]:
+            # Look up the corresponding original/learned clause
+            # The pivot detection is between adjacent clauses in the chain
+            itp_existing = self._partial_itps[orig_idx]
+            source_existing = self._source.get(orig_idx, 'AB')
+
+            # Determine resolution operator based on source classification
+            if source_existing == 'B':
+                # B-local resolution: AND combinator (Pudlák rule)
+                itp = And(itp, itp_existing)
+            else:
+                # A-local or shared: OR combinator
+                itp = Or(itp, itp_existing)
 
         self._source[clause_idx] = 'AB'
         self._partial_itps[clause_idx] = itp if itp is not None else Top
 
-    def _find_pivot(self, origins: List[int], resolvent: Clause) -> Set[str]:
-        """Find pivot variables by comparing origin clauses with resolvent."""
-        pivot_vars: Set[str] = set()
-        for orig_idx in origins:
-            # Approximate: variables in origins but not in resolvent are pivots
-            pass
-        return pivot_vars
+    def _find_pivot(self, clause_a: Clause, clause_b: Clause) -> Set[str]:
+        """Find pivot variables between two clauses.
+
+        A pivot is a variable that appears with opposite polarity in the
+        two clauses (e.g., literal p in one clause and ¬p in the other).
+        This follows the standard resolution rule: from (C ∨ p) and (D ∨ ¬p)
+        derive (C ∨ D), where p is the pivot.
+
+        Returns the set of all such pivot variables.
+        """
+        pivots: Set[str] = set()
+        # Build polarity maps for fast lookup
+        polarity_a: Dict[str, bool] = {}
+        polarity_b: Dict[str, bool] = {}
+        for v, sign in clause_a:
+            if v not in polarity_a:
+                polarity_a[v] = sign
+        for v, sign in clause_b:
+            if v not in polarity_b:
+                polarity_b[v] = sign
+        # A variable is a pivot if it appears in both clauses with opposing signs
+        for v in polarity_a:
+            if v in polarity_b and polarity_a[v] != polarity_b[v]:
+                pivots.add(v)
+        return pivots
 
     def _interpolant_A(self, clause: Clause) -> Formula:
         """Initial interpolant for an A-clause."""
@@ -747,7 +890,7 @@ class NeuroProofSolver:
                     time_sec=time.perf_counter() - t0)
 
             # ---- Decision (VSIDS + Phase Saving) ----
-            decision_var = self._pick_variable_vsids(unassigned)
+            decision_var = self._pick_variable_vsids(unassigned, clause_db)
             decision_val = assignment._saved_polarity.get(decision_var, True)
             stats['decisions'] += 1
             assignment.push_level()
@@ -781,7 +924,7 @@ class NeuroProofSolver:
 
                 # Clause Minimization (recursive)
                 learned, mini_count = self._minimize_clause(
-                    learned, assignment, reason_map)
+                    learned, assignment, reason_map, clause_db)
                 stats['minimized_literals'] += mini_count
 
                 # Compute LBD
@@ -809,8 +952,38 @@ class NeuroProofSolver:
                         self._vsids[v] *= 1e-100
                     self._vsids_inc *= 1e-100
 
-                # EXP3-ATSS: record success for CDCL learning
-                self._atss.update(0, 1.0)  # tactic 0 = CDCL core
+                # EXP3-ATSS: adaptive tactic selection based on clause quality
+                # Sample a tactic from the adversarial bandit distribution
+                chosen_tactic = self._atss.sample_tactic()
+                # Compute reward: higher for lower LBD (better clause quality)
+                # LBD=1 (unit propagation) → reward=1.0; LBD=10 → reward≈0.1
+                reward = 1.0 / (1.0 + lbd) if lbd > 0 else 1.0
+                # Update EXP3 bandit with observed reward
+                self._atss.update(chosen_tactic, reward)
+                # Store learned clause as lemma for future reuse
+                lit_formulas = [Var(v) if sign else Not(Var(v)) for v, sign in learned]
+                if lit_formulas:
+                    lemma_f = lit_formulas[0]
+                    for lf in lit_formulas[1:]:
+                        lemma_f = Or(lemma_f, lf)
+                else:
+                    lemma_f = Bot
+                self._atss.store_lemma(ProofStep(
+                    rule_name="LEARNED_CLAUSE",
+                    premises=[],
+                    conclusion=lemma_f,
+                    depth=1))
+
+                # Virtuous cycle: also store interpolation result as cut formula
+                if self._interpolator is not None:
+                    interpolant = self._interpolator.get_interpolant(
+                        learned_clause_idx)
+                    if interpolant is not None:
+                        self._atss.store_lemma(ProofStep(
+                            rule_name="INTERPOLATION_GUIDED_CUT",
+                            premises=[],
+                            conclusion=interpolant,
+                            depth=1))
 
                 # Backjump
                 assignment.pop_to_level(backjump_level)
@@ -891,30 +1064,60 @@ class NeuroProofSolver:
     # ==========================================================================
 
     def _minimize_clause(self, clause: Clause, asgn: Assignment,
-                          reason_map: Dict[str, int]) -> Tuple[Clause, int]:
+                          reason_map: Dict[str, int],
+                          clause_db: Optional[List[Clause]] = None) -> Tuple[Clause, int]:
         """
-        Recursively minimize the learned clause by removing literals
-        that are implied by other literals in the clause at the same
-        decision level.
+        Minimize the learned clause using recursive self-subsumption.
+
+        For each literal l in the clause, check if the clause without l
+        is still asserting (i.e., all other literals are falsified at
+        the current or earlier decision levels).  If l is redundant,
+        it is removed.
+
+        Additionally, remove any literal that is assigned at level 0
+        (since they are unconditionally true/false and cannot contribute
+        to a conflict).
         """
-        minimized = set(clause)
-        original_count = len(minimized)
+        clause_list = list(clause)
+        n_original = len(clause_list)
+
+        # Phase 1: Remove level-0 literals (unconditionally assigned)
+        minimized = [lit for lit in clause_list
+                     if asgn.var_level(lit[0]) > 0]
         dl = asgn.decision_level
 
-        for lit in list(minimized):
+        # Phase 2: Recursive self-subsumption
+        # A literal is redundant if removing it still leaves an
+        # asserting clause (all remaining literals are falsified at
+        # levels <= current decision level)
+        i = 0
+        while i < len(minimized):
+            lit = minimized[i]
             v = lit[0]
-            if asgn.var_level(v) < dl and v in reason_map:
+            # Keep the literal if:
+            # (a) it's from the current decision level (likely the 1-UIP), or
+            # (b) we cannot determine redundancy without deeper analysis
+            if asgn.var_level(v) == dl:
+                i += 1
+                continue
+            # Check if v has a reason clause that subsumes it
+            if v in reason_map and clause_db is not None:
                 reason_idx = reason_map[v]
-                # Check if removing this literal still yields an asserting clause
-                # Simplified: keep literals from lower levels
-                pass
+                if reason_idx < len(clause_db):
+                    reason_clause = clause_db[reason_idx]
+                    # Check if all literals in the reason clause (except v)
+                    # are also in the minimized clause — if so, v is redundant
+                    reason_lits = {rlit for rlit in reason_clause
+                                   if rlit[0] != v}
+                    clause_lits = set(minimized[:i] + minimized[i+1:])
+                    if reason_lits.issubset(clause_lits):
+                        # v is subsumed by its reason clause — remove it
+                        minimized.pop(i)
+                        continue
+            i += 1
 
-        # Simple minimization: remove literals at level 0
-        minimized = {lit for lit in minimized
-                     if asgn.var_level(lit[0]) > 0}
-        removed = original_count - len(minimized)
-
-        return frozenset(minimized), removed
+        removed = n_original - len(minimized)
+        return frozenset(minimized), max(0, removed)
 
     # ==========================================================================
     # LBD Computation
@@ -972,18 +1175,26 @@ class NeuroProofSolver:
                     new_origins.append(learned_origins[idx])
 
         clause_db[:] = new_db
-        # Note: learned_origins and _learned_lbd indices are stale after
-        # deletion. In a production solver we'd rebuild these carefully,
-        # but for our research prototype this simplified approach is acceptable
-        # since clause deletion happens infrequently and primarily affects
-        # performance, not correctness.
+        learned_origins[:] = new_origins
+        # Rebuild LBD index to reflect new clause database indices
+        new_lbd: Dict[int, float] = {}
+        for old_idx, lbd in self._learned_lbd.items():
+            if old_idx in old_to_new:
+                new_lbd[old_to_new[old_idx]] = lbd
+        self._learned_lbd = new_lbd
 
     # ==========================================================================
     # VSIDS Variable Selection
     # ==========================================================================
 
-    def _pick_variable_vsids(self, unassigned: Set[str]) -> str:
-        """Proper VSIDS with occurrence-count fallback."""
+    def _pick_variable_vsids(self, unassigned: Set[str],
+                              clause_db: Optional[List[Clause]] = None) -> str:
+        """Proper VSIDS with occurrence-count fallback.
+
+        Primary: pick variable with highest accumulated VSIDS score.
+        Fallback (cold start, no scores yet): count literal occurrences
+        across all clauses for the initial ranking.
+        """
         best_var = None
         best_score = -1.0
         for v in unassigned:
@@ -992,11 +1203,18 @@ class NeuroProofSolver:
                 best_score = score
                 best_var = v
         if best_score < 1e-9:
-            # Fall back to frequency in recent clauses
-            scores: Dict[str, float] = {v: 0.0 for v in unassigned}
-            # This is only for the initial phase before VSIDS accumulates
-            return max(unassigned, key=lambda v: sum(
-                1 for c in self._vsids if c == v))
+            # Cold start: no VSIDS scores accumulated yet.
+            # Count variable occurrences across all clauses for initial ranking.
+            if clause_db is not None:
+                counts: Dict[str, int] = {v: 0 for v in unassigned}
+                for clause in clause_db:
+                    for v, _ in clause:
+                        if v in counts:
+                            counts[v] += 1
+                if counts:
+                    return max(counts, key=lambda v: counts[v])
+            # If no clause DB available, pick first unassigned variable
+            return next(iter(unassigned))
         return best_var
 
     # ==========================================================================

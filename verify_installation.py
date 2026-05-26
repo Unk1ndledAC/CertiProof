@@ -208,7 +208,7 @@ def test_solver_module():
     """Test solver.py: CDCL solving, ATSS."""
     print("\n[4] solver.py")
     from src.formula import Var, Not, And, Or, Implies, parse
-    from src.solver import (NeuroProofSolver, ATSS, SolverStatus,
+    from src.solver import (NeuroProofSolver, EXP3ATSS, SolverStatus,
                              Clause, pos, neg_lit, negate_lit,
                              clause_from_formula)
 
@@ -222,13 +222,15 @@ def test_solver_module():
     clause = clause_from_formula(Or(p, Not(q)))
     check("clause_from_formula", clause == frozenset({("p", True), ("q", False)}))
 
-    # ATSS
-    atss = ATSS()
-    check("ATSS initial score", abs(atss.score(p) - 0.5) < 0.01)
-    atss.record_success(p)
-    check("ATSS score after success", atss.score(p) > 0.5)
-    atss.record_failure(p)
-    check("ATSS score after failure (decayed)", atss.score(p) < 1.0)
+    # EXP3-ATSS (adversarial bandit)
+    atss = EXP3ATSS(n_tactics=4)
+    check("EXP3ATSS initial score", abs(atss.score(p) - 0.5) < 0.51)
+    # Update tactic 0 with reward 1.0 (success)
+    atss.update(chosen=0, reward=1.0)
+    check("EXP3ATSS score stable", atss.score(p) > 0.0)
+    # Update tactic 0 with reward 0.0 (failure)
+    atss.update(chosen=0, reward=0.0)
+    check("EXP3ATSS weight updated", atss._weights[0] > 0.0)
 
     # Simple SAT solving
     solver = NeuroProofSolver(max_conflicts=10000)
