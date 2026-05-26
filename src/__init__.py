@@ -21,7 +21,7 @@ from .formula import (
 )
 from .proof import Proof, ProofStep, ProofBuilder, Rule
 from .kernel import verify_step, verify_step_strict, KernelError
-from .solver import NeuroProofSolver, ATSS, SolverStatus, SolverResult
+from .solver import NeuroProofSolver, EXP3ATSS, SolverStatus, SolverResult
 from .tactic import TacticEngine, TacticResult, decide, tauto, refute
 
 # GNN ATSS (optional, requires torch_geometric)
@@ -42,7 +42,7 @@ __all__ = [
     # Kernel
     "verify_step", "verify_step_strict", "KernelError",
     # Solver
-    "NeuroProofSolver", "ATSS", "SolverStatus", "SolverResult",
+    "NeuroProofSolver", "EXP3ATSS", "SolverStatus", "SolverResult",
     # Tactics
     "TacticEngine", "TacticResult", "decide", "tauto", "refute",
 ]

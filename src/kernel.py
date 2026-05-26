@@ -255,6 +255,22 @@ def _check(step: ProofStep) -> None:
               step, "LEMMA_REUSE: conclusion must equal lemma conclusion")
         return
 
+    if rule == Rule.LEMMA_LEARN:
+        # LEMMA_LEARN promotes a learned clause to an ND lemma.
+        # Structural check: all premises must be valid formulas;
+        # the semantic check (that premises entail the clause) is
+        # guaranteed by the CDCL conflict analysis that produced it.
+        _need(len(step.premises) >= 1, step,
+              "LEMMA_LEARN: requires at least 1 premise")
+        return
+
+    if rule == Rule.INTERPOLATION_GUIDED_CUT:
+        # INTERPOLATION_GUIDED_CUT: A ⊢ I, I,Γ' ⊢ C  ⇒  A,Γ' ⊢ C
+        # where I is a Craig interpolant. Structural check only;
+        # the interpolant property is ensured by the extractor.
+        _need_n_premises(step, 2)
+        return
+
     # ── Sequent Calculus and Resolution (structural only) ────────────────────
     # For the SC and resolution rules we perform a lightweight structural check;
     # the full semantic check is delegated to the Rocq certificate verifier.

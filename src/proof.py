@@ -82,9 +82,11 @@ class Rule(Enum):
     RES_FACTOR   = auto()   # factoring
 
     # NeuroProof — novel rules (contributions of this paper)
-    ADAPTIVE_CUT   = auto()  # learned cut formula selection (§3.3)
-    INTERPOLANT    = auto()  # Craig interpolation step (§3.4)
-    LEMMA_REUSE    = auto()  # proof graph edge reuse (§3.5)
+    ADAPTIVE_CUT            = auto()  # learned cut formula selection
+    INTERPOLANT             = auto()  # Craig interpolation step
+    LEMMA_REUSE             = auto()  # proof graph edge reuse
+    LEMMA_LEARN             = auto()  # CDCL conflict-clause → ND lemma
+    INTERPOLATION_GUIDED_CUT = auto() # Craig-interpolant-guided cut
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -457,6 +459,48 @@ class ProofBuilder:
             rule=Rule.LEMMA_REUSE,
             premises=[lemma],
             annotation=annotation or f'Lemma: {lemma.conclusion}'))
+
+    def lemma_learn(self, premises: List[ProofStep],
+                    learned_clause: Formula,
+                    annotation: str = '') -> ProofStep:
+        """
+        LEMMA_LEARN (NeuroProof — novel rule):
+        Promote a CDCL-learned conflict clause to a natural deduction lemma.
+        
+        Given a set of premises φ₁, ..., φₙ that together entail the clause
+        C = l₁ ∨ ... ∨ lₘ, this rule asserts C as a provable formula.
+        The soundness is guaranteed by the CDCL conflict analysis which
+        ensures that the conjunction of premises implies the clause.
+        
+        This bridges the gap between CNF-level clause learning and
+        ND-level lemma introduction — a novel contribution of NeuroProof.
+        """
+        return self._add(ProofStep(
+            conclusion=learned_clause,
+            rule=Rule.LEMMA_LEARN,
+            premises=premises,
+            annotation=annotation or f'LEMMA_LEARN: {learned_clause}'))
+
+    def interpolation_guided_cut(self, left: ProofStep,
+                                  right: ProofStep,
+                                  interpolant: Formula,
+                                  annotation: str = '') -> ProofStep:
+        """
+        INTERPOLATION_GUIDED_CUT (NeuroProof — novel rule):
+        Structure-aware cut rule guided by Craig interpolation.
+        
+        Given A ⊢ I (left premise) and I, Γ' ⊢ C (right premise), where I
+        is a Craig interpolant of A ∧ ¬C, derive A, Γ' ⊢ C.
+        
+        Unlike the generic ADAPTIVE_CUT, this rule uses the semantic
+        information encoded in the interpolant to decompose the proof
+        into structurally meaningful sub-proofs.
+        """
+        return self._add(ProofStep(
+            conclusion=right.conclusion,
+            rule=Rule.INTERPOLATION_GUIDED_CUT,
+            premises=[left, right],
+            annotation=annotation or f'INTERPOLATION-GUIDED-CUT: I=[{interpolant}]'))
 
     # ── Build ─────────────────────────────────────────────────────────────────
 

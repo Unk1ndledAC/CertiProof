@@ -39,7 +39,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.formula import Var, Not, And, Or, Implies, parse, Formula
-from src.solver import NeuroProofSolver, ATSS, SolverStatus, Clause
+from src.solver import NeuroProofSolver, EXP3ATSS, ATSS, SolverStatus, Clause
 from src.tactic import TacticEngine, tauto
 from src.proof import Proof
 
@@ -381,7 +381,7 @@ class ExperimentRunner:
                          timeout: float = 60.0,
                          max_conflicts: int = 50_000) -> BenchmarkResult:
         atss = ATSS()
-        solver = NeuroProofSolver(atss=atss, max_conflicts=max_conflicts)
+        solver = NeuroProofSolver(exp3_atss=atss, max_conflicts=max_conflicts)
         all_vars: set = set()
         for c in clauses:
             for v, _ in c:

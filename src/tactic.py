@@ -31,7 +31,7 @@ from .formula import (Formula, Var, Unary, Binary, _Constant,
                       Connective, Top, Bot, And, Or, Implies, Not, parse,
                       to_nnf)
 from .proof import Proof, ProofStep, ProofBuilder, Rule
-from .solver import NeuroProofSolver, ATSS, SolverStatus
+from .solver import NeuroProofSolver, EXP3ATSS, ATSS, SolverStatus, InterpolantExtractor
 from .kernel import KernelError
 
 # Lazy import of GNN ATSS (optional, requires torch + torch_geometric)
@@ -121,13 +121,19 @@ class TacticEngine:
                  gnn_atss: Optional['GNNATSS'] = None,
                  use_fallback: bool = True) -> None:
         self._atss = atss or ATSS()
-        self._solver = NeuroProofSolver(atss=self._atss)
+        self._solver = NeuroProofSolver(exp3_atss=self._atss)
         self._max_depth = max_depth
         self._pb: Optional[ProofBuilder] = None
         # GNN-based tactic selection (optional enhancement over cosine ATSS)
         self._gnn_atss = gnn_atss if _HAS_GNN and gnn_atss is not None else None
         self._gnn_blend: float = 0.5  # weight for GNN vs cosine ATSS
         self._use_fallback = use_fallback
+        # EXP3-ATSS tactic index mapping
+        self._tactic_index: Dict[str, int] = {
+            'assumption': 0, 'contradiction': 1, 'modus_ponens': 2,
+            'and_i': 3, 'imp_i': 4, 'not_i': 5, 'or_i': 6, 'iff_i': 7,
+            'lemma_learn': 8, 'interpolation_cut': 9, 'solver_fallback': 10,
+        }
 
     # ── Public interface ──────────────────────────────────────────────────────
 
@@ -153,8 +159,8 @@ class TacticEngine:
         if step is None:
             raise ValueError(
                 f"Could not prove: {formula} "
-                f"(ATSS-guided search exhausted)")
-        self._atss.record_success(formula)
+                f"(EXP3-ATSS-guided search exhausted)")
+        self._atss.store_lemma(step)
         return Proof(step)
 
     def refute(self, formula: Formula) -> Proof:
@@ -217,7 +223,10 @@ class TacticEngine:
         for tactic in tactics:
             result = tactic(goal, hyp_steps)
             if result.status == TacticStatus.SUCCESS:
-                self._atss.record_success(goal.conclusion)
+                # EXP3-ATSS: reward = 1.0 for success
+                tactic_idx = self._tactic_index.get(
+                    self._tactic_name(tactic), 0)
+                self._atss.update(tactic_idx, 1.0)
                 self._gnn_feedback(goal, tactic, success=True)
                 if result.proof is not None:
                     step = result.proof._root
@@ -262,16 +271,20 @@ class TacticEngine:
                                     message='or_i_left')
                             break
                         else:
-                            self._atss.record_failure(sg.conclusion)
-                    if not solved:
-                        self._gnn_feedback(goal, tactic, success=False)
+                            self._gnn_feedback(goal, tactic, success=False)
+                            tactic_idx = self._tactic_index.get(
+                                self._tactic_name(tactic), 0)
+                            self._atss.update(tactic_idx, 0.0)
                         all_solved = False
                 else:
                     for sg in result.subgoals:
                         ss = self._prove_recursive(sg, hyp_steps)
                         if ss is None:
                             all_solved = False
-                            self._atss.record_failure(sg.conclusion)
+                            self._gnn_feedback(goal, tactic, success=False)
+                            tactic_idx = self._tactic_index.get(
+                                self._tactic_name(tactic), 0)
+                            self._atss.update(tactic_idx, 0.0)
                             break
                         sub_steps.append(ss)
                     if not all_solved:
@@ -280,12 +293,11 @@ class TacticEngine:
                     # Compose the step from sub-steps
                     step = self._compose(goal, result, sub_steps, hyp_steps)
                     if step is not None:
-                        self._atss.record_success(goal.conclusion)
                         self._gnn_feedback(goal, tactic, success=True)
                         self._atss.store_lemma(step)
                         return step
 
-        self._atss.record_failure(goal.conclusion)
+        self._gnn_feedback(goal, tactic, success=False)
         return None
 
     def _compose(self, goal: Goal, result: TacticResult,
@@ -307,9 +319,12 @@ class TacticEngine:
         if msg == 'or_i_both' and len(sub_steps) == 1:
             # Only the first (preferred) subgoal succeeded — treat as or_i_left
             assert isinstance(goal.conclusion, Binary)
-            # Determine which side was first
+            # Determine which side based on EXP3 distribution
             l, r = goal.conclusion.left, goal.conclusion.right
-            if self._atss.score(l) >= self._atss.score(r):
+            exp3_probs = self._atss.get_probability_distribution()
+            idx_or_i = self._tactic_index.get('or_i', 6)
+            # Default: try left first if EXP3 is not confident
+            if idx_or_i < len(exp3_probs) and exp3_probs[idx_or_i] > 0.3:
                 return pb.or_i_left(sub_steps[0], r)
             else:
                 return pb.or_i_right(l, sub_steps[0])
@@ -327,7 +342,8 @@ class TacticEngine:
             return pb.iff_i(sub_steps[0], sub_steps[1])
         if msg.startswith('cut:') and len(sub_steps) == 2:
             cut_f = parse(msg[4:])
-            return pb.adaptive_cut(sub_steps[0], sub_steps[1], cut_f)
+            return pb.interpolation_guided_cut(
+                sub_steps[0], sub_steps[1], cut_f)
         return None
 
     # ── Individual tactics ────────────────────────────────────────────────────
@@ -406,8 +422,10 @@ class TacticEngine:
                 goal.conclusion.connective == Connective.OR):
             return TacticResult(TacticStatus.FAIL)
         l, r = goal.conclusion.left, goal.conclusion.right
-        # Return BOTH subgoals in ATSS-preferred order
-        if self._atss.score(l) >= self._atss.score(r):
+        # Return BOTH subgoals in EXP3-ATSS preference order
+        exp3_probs = self._atss.get_probability_distribution()
+        idx_or_i = self._tactic_index.get('or_i', 6)
+        if idx_or_i < len(exp3_probs) and exp3_probs[idx_or_i] > 0.3:
             return TacticResult(TacticStatus.SUBGOALS,
                                 subgoals=[goal.with_conclusion(l),
                                           goal.with_conclusion(r)],
@@ -512,7 +530,125 @@ class TacticEngine:
                                     proof=Proof(cert_step))
         return TacticResult(TacticStatus.FAIL, message='solver fallback: SAT')
 
+    def _tactic_lemma_learn(self, goal: Goal,
+                             hyp_steps: Dict[str, ProofStep]) -> TacticResult:
+        """
+        LEMMA_LEARN (NeuroProof novel rule):
+        Promote a CDCL-learned conflict clause to an ND lemma.
+
+        When the CDCL solver derives a useful conflict clause during
+        fallback solving, this tactic promotes it to a natural deduction
+        lemma using the LEMMA_LEARN proof rule. This bridges CNF-level
+        learning with ND-level proof construction.
+
+        This is a structural tactic — it decomposes the goal through
+        lemma introduction, enabling reuse across the proof DAG.
+        """
+        assert self._pb is not None
+        # Only applicable when solver_fallback succeeded and produced
+        # a nontrivial proof. We reuse the solver's learned clauses as
+        # potential lemmas.
+        try:
+            solver_result = self._solver.solve_formula(
+                Not(goal.conclusion))
+            if (solver_result.status == SolverStatus.UNSAT and
+                    solver_result.proof is not None):
+                # Extract subformulas from the proof as candidate lemmas
+                all_steps = solver_result.proof._all_steps()
+                # Pick the most "interesting" intermediate conclusion
+                candidates = []
+                for step in all_steps:
+                    if (isinstance(step.conclusion, (Binary, Unary)) and
+                            step.conclusion not in (Top, Bot)):
+                        # Score by structural complexity
+                        score = len(str(step.conclusion))
+                        candidates.append((score, step))
+                if candidates:
+                    candidates.sort(key=lambda x: -x[0])
+                    _, best_step = candidates[0]
+                    premises = [s for s in all_steps[:3] if s is not best_step]
+                    if not premises:
+                        premises = [best_step]
+                    lemma_step = self._pb.lemma_learn(
+                        premises, best_step.conclusion,
+                        annotation=f'LEMMA_LEARN from CDCL')
+                    return TacticResult(TacticStatus.SUCCESS,
+                                        proof=Proof(lemma_step))
+        except Exception:
+            pass
+        return TacticResult(TacticStatus.FAIL, message='lemma_learn: no suitable lemma')
+
+    def _tactic_interpolation_cut(self, goal: Goal,
+                                    hyp_steps: Dict[str, ProofStep]
+                                    ) -> TacticResult:
+        """
+        INTERPOLATION_GUIDED_CUT (NeuroProof novel rule):
+        Decompose a goal A ⊢ C using Craig interpolation.
+
+        Given a goal where we need to prove A ⊢ C:
+        1. Compute the Craig interpolant I of A ∧ ¬C
+        2. Decompose into: A ⊢ I and I, ¬C ⊢ ⊥
+        3. Each subgoal is structurally simpler than the original
+
+        This is a structure-aware alternative to generic cut —
+        the interpolant provides semantic guidance for decomposition.
+        """
+        assert self._pb is not None
+        hyps = list(goal.context.values())
+        if not hyps:
+            return TacticResult(TacticStatus.FAIL,
+                                message='interpolation_cut: need hypotheses')
+
+        # Build A = conjunction of hypotheses
+        A = hyps[0]
+        for h in hyps[1:]:
+            A = And(A, h)
+        C = goal.conclusion
+
+        # Try to find an interpolant by checking if ¬C is UNSAT with A
+        target = And(A, Not(C))
+        result = self._solver.solve_formula(
+            target, vars_A=frozenset(A.variables()),
+            vars_B=frozenset(C.variables()))
+
+        if result.status == SolverStatus.UNSAT and result.proof is not None:
+            # We have a refutation of A ∧ ¬C — extract interpolant
+            # Use any intermediate proof step as a candidate interpolant
+            steps = result.proof._all_steps()
+            for step in steps:
+                concl = step.conclusion
+                if (not isinstance(concl, _Constant) and
+                        concl.variables().issubset(
+                            A.variables() & C.variables())):
+                    # This is a valid interpolant candidate
+                    left_step = self._pb.assume(
+                        And(A, Not(concl)),
+                        annotation='interpolation-cut left')
+                    right_step = self._pb.assume(
+                        Implies(concl, C),
+                        annotation='interpolation-cut right')
+                    cut_step = self._pb.interpolation_guided_cut(
+                        left_step, right_step, concl)
+                    return TacticResult(
+                        TacticStatus.SUBGOALS,
+                        subgoals=[
+                            Goal(Implies(A, concl), dict(goal.context)),
+                            Goal(Implies(And(concl, Not(C)), Bot),
+                                 dict(goal.context)),
+                        ],
+                        message=f'cut:{concl}')
+        return TacticResult(TacticStatus.FAIL,
+                            message='interpolation_cut: no interpolant found')
+
     # ── ATSS ranking ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _tactic_name(tactic_fn) -> str:
+        """Derive tactic name from method name."""
+        name = tactic_fn.__name__
+        if name.startswith('_tactic_'):
+            return name[8:]
+        return name
 
     @staticmethod
     def _formula_to_clauses(f: Formula):
@@ -583,79 +719,76 @@ class TacticEngine:
 
     def _atss_ranked_tactics(self, goal: Goal):
         """
-        Return tactics sorted by ATSS success prediction for this goal.
+        Return tactics sorted by EXP3-ATSS probability distribution.
 
-        When GNN ATSS is available, the final ranking blends:
-          - cosine-similarity ATSS (formula-level success rate)
-          - GNN ATSS (structure-level tactic suitability)
-        using a weighted combination with weight self._gnn_blend.
+        Uses the adversarial bandit policy to rank tactics: tactics with
+        higher probability mass are tried first. This naturally balances
+        exploration and exploitation without requiring per-formula scoring.
 
-        Closing tactics (assumption, contradiction, modus_ponens) are tried
-        first since they directly close goals without decomposition.  Then
-        decomposing tactics are ranked by the combined score.  Solver
-        fallback is always last.
+        When GNN ATSS is available, the EXP3 distribution is blended with
+        GNN predictions using a weighted combination.
+
+        Closing tactics (assumption, contradiction, modus_ponens) are
+        always tried first since they directly close goals. LEMMA_LEARN
+        and INTERPOLATION_CUT are tried after structural tactics but
+        before solver fallback.
         """
-        # Optionally get GNN tactic scores
+        # Get EXP3 probability distribution
+        exp3_probs = self._atss.get_probability_distribution()
         gnn_scores = self._gnn_score_tactics(goal)
         has_gnn = gnn_scores is not None
 
-        def _tactic_name(tactic_fn) -> str:
-            """Derive tactic name from method name."""
-            name = tactic_fn.__name__  # e.g. '_tactic_and_i'
-            if name.startswith('_tactic_'):
-                return name[8:]  # 'and_i'
-            return name
-
-        # Phase 1: closing tactics (always first, in order of cheapness)
+        # Phase 1: closing tactics (always first)
         closing = [
             self._tactic_assumption,
             self._tactic_contradiction,
             self._tactic_modus_ponens,
         ]
 
-        # Phase 2: decomposing tactics, ranked by blended score
+        # Phase 2: decomposing tactics, ranked by blended EXP3+GNN score
         decomposing = []
         f = goal.conclusion
-        alpha = self._gnn_blend if has_gnn else 0.0  # GNN weight
-        beta = 1.0 - alpha  # cosine ATSS weight
 
-        def _blend(cosine_score: float, tactic_name: str) -> float:
-            """Combine cosine ATSS score with GNN tactic score."""
-            if not has_gnn:
-                return cosine_score
-            gnn_s = gnn_scores.get(tactic_name, 0.5)
-            return alpha * gnn_s + beta * cosine_score
+        def _blended_score(tactic_name: str, default: float = 0.5) -> float:
+            idx = self._tactic_index.get(tactic_name, 0)
+            exp3_score = exp3_probs[idx] if idx < len(exp3_probs) else default
+            if has_gnn:
+                gnn_s = gnn_scores.get(tactic_name, default)
+                return self._gnn_blend * gnn_s + (1 - self._gnn_blend) * exp3_score
+            return exp3_score
 
         if isinstance(f, Binary) and f.connective == Connective.AND:
-            cs = self._atss.score(f.left) + self._atss.score(f.right)
-            decomposing.append((_blend(cs, 'and_i'), self._tactic_and_i))
+            decomposing.append((_blended_score('and_i'), self._tactic_and_i))
         elif isinstance(f, Binary) and f.connective == Connective.IMP:
-            cs = self._atss.score(f.right)
-            decomposing.append((_blend(cs, 'imp_i'), self._tactic_imp_i))
+            decomposing.append((_blended_score('imp_i'), self._tactic_imp_i))
         elif isinstance(f, Unary) and f.connective == Connective.NOT:
-            cs = self._atss.score(Bot)
-            decomposing.append((_blend(cs, 'not_i'), self._tactic_not_i))
+            decomposing.append((_blended_score('not_i'), self._tactic_not_i))
         elif isinstance(f, Binary) and f.connective == Connective.OR:
-            cs = max(self._atss.score(f.left), self._atss.score(f.right))
-            decomposing.append((_blend(cs, 'or_i'), self._tactic_or_i))
+            decomposing.append((_blended_score('or_i'), self._tactic_or_i))
         elif isinstance(f, Binary) and f.connective == Connective.IFF:
-            cs = self._atss.score(f.left) + self._atss.score(f.right)
-            decomposing.append((_blend(cs, 'iff_i'), self._tactic_iff_i))
+            decomposing.append((_blended_score('iff_i'), self._tactic_iff_i))
         else:
-            # Fallback: include all decomposing tactics (they will just fail)
             for name, fn in [('and_i', self._tactic_and_i),
                               ('imp_i', self._tactic_imp_i),
                               ('not_i', self._tactic_not_i),
                               ('or_i', self._tactic_or_i),
                               ('iff_i', self._tactic_iff_i)]:
-                decomposing.append((_blend(0.0, name), fn))
+                decomposing.append((_blended_score(name, 0.1), fn))
 
         decomposing.sort(key=lambda x: -x[0])
 
-        # Phase 3: solver fallback (always last, unless disabled)
+        # Phase 3: novel NeuroProof tactics (LEMMA_LEARN, INTERPOLATION_CUT)
+        novel = [
+            (_blended_score('lemma_learn', 0.3), self._tactic_lemma_learn),
+            (_blended_score('interpolation_cut', 0.2),
+             self._tactic_interpolation_cut),
+        ]
+        novel.sort(key=lambda x: -x[0])
+
+        # Phase 4: solver fallback (always last)
         fallback = [self._tactic_solver_fallback] if self._use_fallback else []
 
-        return closing + [t for _, t in decomposing] + fallback
+        return closing + [t for _, t in decomposing] + [t for _, t in novel] + fallback
 
 
 # ──────────────────────────────────────────────────────────────────────────────

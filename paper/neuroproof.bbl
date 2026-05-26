@@ -110,6 +110,11 @@ H.~Xin, D.~Guo, Z.~Shao, Z.~Ren, Q.~Zhu, B.~Liu, C.~Ruan, W.~Li, and X.~Liang,
   reinforcement learning and recursive subgoal decomposition,'' \emph{arXiv
   preprint}, 2025.
 
+\bibitem{AuerCesaBianchiFreundSchapire2002}
+P.~Auer, N.~Cesa-Bianchi, Y.~Freund, and R.~E. Schapire, ``The nonstochastic
+  multiarmed bandit problem,'' \emph{SIAM Journal on Computing}, vol.~32,
+  no.~1, pp. 48--77, 2002.
+
 \bibitem{Tzameret2011}
 I.~Tzameret, ``Algebraic proofs over noncommutative formulas,''
   \emph{Information and Computation}, vol. 209, no.~10, pp. 1269--1292, 2011.
@@ -214,6 +219,10 @@ G.~Gentzen, \emph{The Collected Papers of {G}erhard {G}entzen}, M.~E. Szabo,
 \bibitem{TroelstraSchwichtenberg2000}
 A.~S. Troelstra and H.~Schwichtenberg, \emph{Basic Proof Theory}, 2nd~ed.\hskip
   1em plus 0.5em minus 0.4em\relax Cambridge University Press, 2000.
+
+\bibitem{Azuma1967}
+K.~Azuma, ``Weighted sums of certain dependent random variables,'' \emph{Tohoku
+  Mathematical Journal}, vol.~19, no.~3, pp. 357--367, 1967.
 
 \bibitem{Pitassi1998}
 T.~Pitassi, P.~Beame, and R.~Impagliazzo, ``Exponential lower bounds for the
