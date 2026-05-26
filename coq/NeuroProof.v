@@ -1018,8 +1018,9 @@ Proof.
   pose proof (H v_true) as H_true.
   pose proof (H v_false) as H_false.
   
-  (* Unfold kalmar_context for x::xs *)
+  (* Unfold kalmar_context for x::xs, then unfold v_true/v_false *)
   simpl in H_true. simpl in H_false.
+  unfold v_true, v_false in H_true, H_false.
   
   (* Simplify the freshly-set x's signed literal *)
   assert (E_true : signed_literal (extend_val v x true) x = FVar x).
@@ -1072,23 +1073,25 @@ Fixpoint nodup (xs : list Var) : list Var :=
 (** Membership is preserved by nodup. *)
 Lemma nodup_In : forall xs x, In x xs -> In x (nodup xs).
 Proof.
-  induction xs as [| y ys IH]; simpl; intros H; [contradiction|].
-  destruct (in_dec Nat.eq_dec y ys).
-  - destruct H; [subst; assumption | apply IH; assumption].
-  - destruct H as [H|H].
-    + subst. left. reflexivity.
-    + right. apply IH. exact H.
+  induction xs as [| y ys IH]; intros a Ha.
+  - contradiction.
+  - simpl. destruct (in_dec Nat.eq_dec y ys).
+    + destruct Ha; [subst a|]; apply IH; assumption.
+    + destruct Ha as [Ha|Ha].
+      * subst a. left. reflexivity.
+      * right. apply IH. exact Ha.
 Qed.
 
 (** Converse: if x appears in nodup xs, then x appears in xs. *)
 Lemma nodup_In_inv : forall xs x, In x (nodup xs) -> In x xs.
 Proof.
-  induction xs as [| y ys IH]; simpl; intros H; [contradiction|].
-  destruct (in_dec Nat.eq_dec y ys).
-  - apply IH in H. right. exact H.
-  - destruct H as [H|H].
-    + subst. left. reflexivity.
-    + apply IH in H. right. exact H.
+  induction xs as [| y ys IH]; intros a Ha.
+  - contradiction.
+  - simpl in Ha. destruct (in_dec Nat.eq_dec y ys).
+    + apply IH in Ha. right. exact Ha.
+    + destruct Ha as [Ha|Ha].
+      * subst a. left. reflexivity.
+      * apply IH in Ha. right. exact Ha.
 Qed.
 
 (** Variable elimination by induction over the deduplicated variable list. *)
@@ -1096,16 +1099,16 @@ Lemma nodup_elim : forall xs φ,
   (forall v, Provable (kalmar_context v (nodup xs)) φ) ->
   Provable [] φ.
 Proof.
-  induction xs as [| x xs' IH]; intros H.
+  induction xs as [| y ys IH]; intros φ H.
   - simpl in H. specialize (H (fun _ => true)). simpl in H. exact H.
   - simpl in H.
-    destruct (in_dec Nat.eq_dec x xs').
-    + (* x is a duplicate; skip it *)
+    destruct (in_dec Nat.eq_dec y ys).
+    + (* y is a duplicate; skip it *)
       apply IH. intro v. exact (H v).
-    + (* x is fresh; eliminate it via kalmar_step *)
+    + (* y is fresh; eliminate it via kalmar_step *)
       apply IH. intro v0.
-      apply (kalmar_step x (nodup xs') φ).
-      * intro Hin. apply n. apply nodup_In_inv with (xs := xs'). exact Hin.
+      apply (kalmar_step y (nodup ys) φ).
+      * intro Hin. apply n. apply nodup_In_inv with (xs := ys). exact Hin.
       * exact H.
 Qed.
 
@@ -1138,8 +1141,8 @@ Theorem completeness : forall (φ : Formula),
 Proof.
   intros φ Htaut.
   pose (xs := vars_of_formula φ).
-  assert (Hsub : forall x, In x xs -> In x (nodup xs)).
-  { intros x Hx. apply nodup_In. exact Hx. }
+  assert (Hsub : forall a, In a xs -> In a (nodup xs)).
+  { intros a Ha. apply nodup_In. exact Ha. }
   assert (Hkal : forall v, Provable (kalmar_context v (nodup xs)) φ).
   { intro v. pose proof (kalmar_lemma (nodup xs) φ v Hsub) as H.
     destruct (eval v φ) eqn:Ev.
