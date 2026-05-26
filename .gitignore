@@ -25,9 +25,11 @@ env/
 Thumbs.db
 
 # Coq
-*.vo
 *.glob
 *.aux
+*.vo
+*.vok
+*.vos
 coq/._CoqProject
 
 # Jupyter
