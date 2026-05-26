@@ -1,0 +1,31 @@
+name,instance_id,n_vars,n_clauses,status,solver,time_sec,decisions,conflicts,learned,proof_size,proof_depth
+tauto(p -> p),0,1,0,PROVED,NeuroProof+ATSS,0.000583200000164652,0,0,0,2,1
+tauto(p -> p),1,1,0,PROVED,NeuroProof-noATSS,5.1699999858101364e-05,0,0,0,2,1
+tauto((p -> q) -> (q -> r) -> (p -> r)),0,3,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof+ATSS,0.0,0,0,0,0,0
+tauto((p -> q) -> (q -> r) -> (p -> r)),1,3,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof-noATSS,0.0,0,0,0,0,0
+tauto((p & q) -> p),0,2,0,PROVED,NeuroProof+ATSS,5.440000018097635e-05,0,0,0,3,2
+tauto((p & q) -> p),1,2,0,PROVED,NeuroProof-noATSS,3.990000004705507e-05,0,0,0,3,2
+tauto((p & q) -> q),0,2,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof+ATSS,0.0,0,0,0,0,0
+tauto((p & q) -> q),1,2,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof-noATSS,0.0,0,0,0,0,0
+tauto(p -> (q -> p)),0,2,0,PROVED,NeuroProof+ATSS,6.43999999283551e-05,0,0,0,4,3
+tauto(p -> (q -> p)),1,2,0,PROVED,NeuroProof-noATSS,5.25000000379805e-05,0,0,0,4,3
+tauto(p -> (p | q)),0,2,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof+ATSS,0.0,0,0,0,0,0
+tauto(p -> (p | q)),1,2,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof-noATSS,0.0,0,0,0,0,0
+tauto(q -> (p | q)),0,2,0,PROVED,NeuroProof+ATSS,6.95999999607011e-05,0,0,0,3,2
+tauto(q -> (p | q)),1,2,0,PROVED,NeuroProof-noATSS,5.970000006527698e-05,0,0,0,3,2
+tauto((p -> q) -> ((p -> ~q) -> ~p)),0,2,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof+ATSS,0.0,0,0,0,0,0
+tauto((p -> q) -> ((p -> ~q) -> ~p)),1,2,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof-noATSS,0.0,0,0,0,0,0
+tauto((~p -> ~q) -> (q -> p)),0,2,0,PROVED,NeuroProof+ATSS,5.469999996421393e-05,0,0,0,5,4
+tauto((~p -> ~q) -> (q -> p)),1,2,0,PROVED,NeuroProof-noATSS,4.770000009557407e-05,0,0,0,5,4
+tauto(((p -> q) & (q -> r)) -> (p -> r)),0,3,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof+ATSS,0.0,0,0,0,0,0
+tauto(((p -> q) & (q -> r)) -> (p -> r)),1,3,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof-noATSS,0.0,0,0,0,0,0
+tauto((p <-> q) -> (q <-> p)),0,2,0,PROVED,NeuroProof+ATSS,9.18999999157677e-05,0,0,0,9,5
+tauto((p <-> q) -> (q <-> p)),1,2,0,PROVED,NeuroProof-noATSS,8.06000000466156e-05,0,0,0,9,5
+tauto(((p | q) & ~p) -> q),0,2,0,PROVED,NeuroProof+ATSS,4.7699999868200393e-05,0,0,0,3,2
+tauto(((p | q) & ~p) -> q),1,2,0,PROVED,NeuroProof-noATSS,4.459999991013319e-05,0,0,0,3,2
+tauto(p | ~p),0,1,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof+ATSS,0.0,0,0,0,0,0
+tauto(p | ~p),1,1,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof-noATSS,0.0,0,0,0,0,0
+tauto(~(p & ~p)),0,1,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof+ATSS,0.0,0,0,0,0,0
+tauto(~(p & ~p)),1,1,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof-noATSS,0.0,0,0,0,0,0
+tauto((p -> q) -> (~q -> ~p)),0,2,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof+ATSS,0.0,0,0,0,0,0
+tauto((p -> q) -> (~q -> ~p)),1,2,0,FAIL:ProofStep.__init__() got an unexpected keyword argument 'rule_name',NeuroProof-noATSS,0.0,0,0,0,0,0

@@ -131,8 +131,8 @@ class TacticEngine:
         # EXP3-ATSS tactic index mapping
         self._tactic_index: Dict[str, int] = {
             'assumption': 0, 'contradiction': 1, 'modus_ponens': 2,
-            'and_i': 3, 'imp_i': 4, 'not_i': 5, 'or_i': 6, 'iff_i': 7,
-            'lemma_learn': 8, 'interpolation_cut': 9, 'solver_fallback': 10,
+            'and_e': 3, 'and_i': 4, 'imp_i': 5, 'not_i': 6, 'or_i': 7, 'iff_i': 8,
+            'lemma_learn': 9, 'interpolation_cut': 10, 'solver_fallback': 11,
         }
 
     # ── Public interface ──────────────────────────────────────────────────────
@@ -247,6 +247,7 @@ class TacticEngine:
                         if ss is not None:
                             sub_steps = [ss]
                             solved = True
+                            all_solved = True
                             # Determine which side we proved
                             l, r = goal.conclusion.left, goal.conclusion.right
                             if idx == 0 and self._atss.score(l) >= self._atss.score(r):
@@ -275,6 +276,7 @@ class TacticEngine:
                             tactic_idx = self._tactic_index.get(
                                 self._tactic_name(tactic), 0)
                             self._atss.update(tactic_idx, 0.0)
+                    if not solved:
                         all_solved = False
                 else:
                     for sg in result.subgoals:
@@ -333,6 +335,12 @@ class TacticEngine:
             hyp_f = goal.conclusion.left
             hyp_step = pb.assume(hyp_f, annotation='imp_i hyp')
             return pb.imp_i(hyp_step, sub_steps[0])
+        if msg.startswith('modus_ponens:') and len(sub_steps) == 1:
+            imp_name = msg.split(':', 1)[1]
+            imp_f = goal.context[imp_name]
+            major = hyp_steps.get(imp_name) or pb.assume(
+                imp_f, annotation=imp_name)
+            return pb.imp_e(major, sub_steps[0])
         if msg == 'not_i' and len(sub_steps) == 1:
             assert isinstance(goal.conclusion, Unary)
             hyp_f = goal.conclusion.child
@@ -423,9 +431,22 @@ class TacticEngine:
             return TacticResult(TacticStatus.FAIL)
         l, r = goal.conclusion.left, goal.conclusion.right
         # Return BOTH subgoals in EXP3-ATSS preference order
-        exp3_probs = self._atss.get_probability_distribution()
+        # On cold start (uniform distribution ~0.083 per tactic), default to
+        # trying left first (lower ASCII/lexicographic order = deterministic).
         idx_or_i = self._tactic_index.get('or_i', 6)
-        if idx_or_i < len(exp3_probs) and exp3_probs[idx_or_i] > 0.3:
+        # Use ATSS preference only after warm-up (non-uniform distribution)
+        prefer_left = True
+        try:
+            exp3_probs = self._atss.get_probability_distribution()
+            if idx_or_i < len(exp3_probs):
+                # If ATSS has a strong preference (>0.3), use it
+                if exp3_probs[idx_or_i] > 0.5:
+                    prefer_left = True   # ATSS prefers or_i → left first
+                elif exp3_probs[idx_or_i] < 0.05:
+                    prefer_left = False  # ATSS avoids or_i → right first
+        except (AttributeError, IndexError):
+            pass  # fallback: prefer_left=True
+        if prefer_left:
             return TacticResult(TacticStatus.SUBGOALS,
                                 subgoals=[goal.with_conclusion(l),
                                           goal.with_conclusion(r)],
@@ -454,6 +475,10 @@ class TacticEngine:
                                ) -> TacticResult:
         """
         Find φ→ψ and φ in context to derive ψ = goal.conclusion.
+
+        If φ→ψ is in context and φ is also in context: close immediately.
+        If φ→ψ is in context but φ is missing: create a subgoal to prove φ
+        (enabling chain deductions like p→q, q→r, p ⊢ r).
         """
         assert self._pb is not None
         psi = goal.conclusion
@@ -471,13 +496,115 @@ class TacticEngine:
                     step = self._pb.imp_e(major, minor)
                     return TacticResult(TacticStatus.SUCCESS,
                                         proof=Proof(step))
+                else:
+                    # Antecedent not in context — create subgoal
+                    sub_goal = goal.with_conclusion(phi)
+                    return TacticResult(
+                        TacticStatus.SUBGOALS,
+                        subgoals=[sub_goal],
+                        message=f'modus_ponens:{name}')
         return TacticResult(TacticStatus.FAIL)
+
+    def _tactic_and_e(self, goal: Goal,
+                       hyp_steps: Dict[str, ProofStep]
+                       ) -> TacticResult:
+        """
+        Conjunction elimination (∧E): extract left or right conjunct
+        from a conjunction hypothesis to match the goal.
+
+        For each hypothesis of the form φ ∧ ψ in context:
+          - If φ == goal.conclusion: close with AND_E_LEFT
+          - If ψ == goal.conclusion: close with AND_E_RIGHT
+
+        If no direct match, recursively decompose nested conjunctions
+        by extracting conjuncts and adding them to the context, then
+        retrying. This handles formulas like (p ∧ (q ∧ r)) → q where
+        the desired atom is two levels deep in the conjunction.
+
+        Termination is guaranteed because each decomposition extracts
+        a strictly smaller subformula.
+        """
+        return self._tactic_and_e_rec(goal, hyp_steps, depth=0)
+
+    def _tactic_and_e_rec(self, goal: Goal,
+                           hyp_steps: Dict[str, ProofStep],
+                           depth: int,
+                           skip_names: Optional[set] = None) -> TacticResult:
+        """Recursive helper for _tactic_and_e with decomposition."""
+        assert self._pb is not None
+        if skip_names is None:
+            skip_names = set()
+        if depth > 10:
+            return TacticResult(TacticStatus.FAIL,
+                                message='and_e: max decomposition depth')
+
+        for name, hyp in goal.context.items():
+            if name in skip_names:
+                continue
+            if not (isinstance(hyp, Binary) and
+                    hyp.connective == Connective.AND):
+                continue
+
+            hyp_step = hyp_steps.get(name) or self._pb.assume(
+                hyp, annotation=name)
+
+            # Phase 1: direct match (closing)
+            if hyp.left == goal.conclusion:
+                step = self._pb.and_e_left(hyp_step)
+                return TacticResult(TacticStatus.SUCCESS,
+                                    proof=Proof(step))
+            if hyp.right == goal.conclusion:
+                step = self._pb.and_e_right(hyp_step)
+                return TacticResult(TacticStatus.SUCCESS,
+                                    proof=Proof(step))
+
+            # Phase 2: decompose — extract conjuncts not yet in context
+            # Mark this AND as processed to avoid infinite loops
+            new_skip = skip_names | {name}
+
+            # Try left first
+            if goal.has_hyp(hyp.left) is None:
+                left_step = self._pb.and_e_left(hyp_step)
+                new_name = f"_he{len(goal.context)}"
+                new_goal = goal.add_hyp(new_name, hyp.left)
+                new_hs = dict(hyp_steps)
+                new_hs[new_name] = left_step
+                result = self._tactic_and_e_rec(
+                    new_goal, new_hs, depth + 1, new_skip)
+                if result.status == TacticStatus.SUCCESS:
+                    return result
+
+            # Try right
+            if goal.has_hyp(hyp.right) is None:
+                right_step = self._pb.and_e_right(hyp_step)
+                new_name = f"_he{len(goal.context)}"
+                new_goal = goal.add_hyp(new_name, hyp.right)
+                new_hs = dict(hyp_steps)
+                new_hs[new_name] = right_step
+                result = self._tactic_and_e_rec(
+                    new_goal, new_hs, depth + 1, new_skip)
+                if result.status == TacticStatus.SUCCESS:
+                    return result
+
+        return TacticResult(TacticStatus.FAIL,
+                            message='and_e: no matching conjunct')
 
     def _tactic_contradiction(self, goal: Goal,
                                hyp_steps: Dict[str, ProofStep]
                                ) -> TacticResult:
-        """Detect contradictory hypotheses φ and ¬φ to derive anything."""
+        """Detect contradictory hypotheses φ and ¬φ to derive anything.
+
+        Handles two cases:
+        1. Direct: φ and ¬φ are both in the context.
+        2. Indirect via modus ponens: if two implications p→φ and p→¬φ
+           share the same antecedent p (which IS in context), derive φ
+           and ¬φ via MP, then derive ⊥ via ¬E.
+           This handles patterns like (p→q) → ((p→¬q) → ¬p) where
+           the contradiction requires intermediate derivations.
+        """
         assert self._pb is not None
+
+        # Case 1: Direct contradiction — φ and ¬φ in context
         for name1, h1 in goal.context.items():
             for name2, h2 in goal.context.items():
                 if name1 == name2:
@@ -494,6 +621,73 @@ class TacticEngine:
                     final = self._pb.bot_e(bot_s, goal.conclusion)
                     return TacticResult(TacticStatus.SUCCESS,
                                         proof=Proof(final))
+
+        # Case 2: Indirect contradiction via modus ponens
+        # Find pairs of implications p→φ and p→¬φ where p is in context.
+        # Then derive φ and ¬φ via MP, and derive ⊥ via ¬E.
+        for name1, h1 in goal.context.items():
+            if not (isinstance(h1, Binary) and
+                    h1.connective == Connective.IMP):
+                continue
+            ante = h1.left
+            ante_name = goal.has_hyp(ante)
+            if ante_name is None:
+                continue  # antecedent not in context, can't derive
+            cons1 = h1.right
+
+            for name2, h2 in goal.context.items():
+                if name2 == name1:
+                    continue
+                if not (isinstance(h2, Binary) and
+                        h2.connective == Connective.IMP):
+                    continue
+                if h2.left != ante:
+                    continue  # different antecedent, skip
+                cons2 = h2.right
+
+                # Check if cons1 and cons2 are contradictory (cons2 = ¬cons1)
+                if (isinstance(cons2, Unary) and
+                        cons2.connective == Connective.NOT and
+                        cons2.child == cons1):
+                    # Derive cons1 via MP(h1, ante)
+                    hyp1_step = hyp_steps.get(name1) or self._pb.assume(
+                        h1, annotation=name1)
+                    ante_step = hyp_steps.get(ante_name) or self._pb.assume(
+                        ante, annotation=ante_name)
+                    cons1_step = self._pb.imp_e(hyp1_step, ante_step)
+                    # Derive ¬cons1 via MP(h2, ante)
+                    hyp2_step = hyp_steps.get(name2) or self._pb.assume(
+                        h2, annotation=name2)
+                    cons2_step = self._pb.imp_e(hyp2_step, ante_step)
+                    # Derive ⊥ via ¬E
+                    bot_step = self._pb.not_e(cons2_step, cons1_step)
+                    if goal.conclusion is Bot:
+                        return TacticResult(TacticStatus.SUCCESS,
+                                            proof=Proof(bot_step))
+                    final = self._pb.bot_e(bot_step, goal.conclusion)
+                    return TacticResult(TacticStatus.SUCCESS,
+                                        proof=Proof(final))
+                # Also check the reverse: cons1 = ¬cons2
+                if (isinstance(cons1, Unary) and
+                        cons1.connective == Connective.NOT and
+                        cons1.child == cons2):
+                    # Same as above but swapped
+                    hyp1_step = hyp_steps.get(name1) or self._pb.assume(
+                        h1, annotation=name1)
+                    ante_step = hyp_steps.get(ante_name) or self._pb.assume(
+                        ante, annotation=ante_name)
+                    cons1_step = self._pb.imp_e(hyp1_step, ante_step)
+                    hyp2_step = hyp_steps.get(name2) or self._pb.assume(
+                        h2, annotation=name2)
+                    cons2_step = self._pb.imp_e(hyp2_step, ante_step)
+                    bot_step = self._pb.not_e(cons1_step, cons2_step)
+                    if goal.conclusion is Bot:
+                        return TacticResult(TacticStatus.SUCCESS,
+                                            proof=Proof(bot_step))
+                    final = self._pb.bot_e(bot_step, goal.conclusion)
+                    return TacticResult(TacticStatus.SUCCESS,
+                                        proof=Proof(final))
+
         return TacticResult(TacticStatus.FAIL)
 
     def _tactic_solver_fallback(self, goal: Goal,
@@ -741,6 +935,7 @@ class TacticEngine:
         # Phase 1: closing tactics (always first)
         closing = [
             self._tactic_assumption,
+            self._tactic_and_e,
             self._tactic_contradiction,
             self._tactic_modus_ponens,
         ]

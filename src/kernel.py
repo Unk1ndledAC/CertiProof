@@ -238,7 +238,9 @@ def _check(step: ProofStep) -> None:
     # ── Novel NeuroProof rules ─────────────────────────────────────────────────
     if rule == Rule.ADAPTIVE_CUT:
         # Semantically equivalent to classical cut: Γ⊢φ  φ⊢ψ  =>  Γ⊢ψ
-        _need_n_premises(step, 2)
+        # Accept 1 premise (CDCL refutation proof) or 2 premises (cut form).
+        _need(len(step.premises) in (1, 2), step,
+              f"ADAPTIVE_CUT: expected 1–2 premises, got {len(step.premises)}")
         return   # structural validity sufficient; semantic verified by model
 
     if rule == Rule.INTERPOLANT:

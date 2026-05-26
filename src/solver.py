@@ -410,7 +410,7 @@ class EXP3ATSS(TacticalSelector):
       Multiarmed Bandit Problem", SIAM J. Comput.
     """
 
-    def __init__(self, n_tactics: int = 8, gamma: float = 0.07,
+    def __init__(self, n_tactics: int = 12, gamma: float = 0.07,
                  eta: Optional[float] = None) -> None:
         """
         Parameters
@@ -788,7 +788,12 @@ class NeuroProofSolver:
         enc = TseitinEncoder()
         cnf = enc.encode(formula)
         clauses = self._cnf_to_clauses(cnf)
-        return self.solve_clauses(clauses, formula.variables(),
+        # Derive all_vars from actual clauses (includes Tseitin auxiliary vars)
+        all_vars_from_clauses: Set[str] = set()
+        for c in clauses:
+            for v, _ in c:
+                all_vars_from_clauses.add(v)
+        return self.solve_clauses(clauses, all_vars_from_clauses,
                                    vars_A=vars_A, vars_B=vars_B)
 
     def solve_clauses(self, clauses: List[Clause],
@@ -843,7 +848,58 @@ class NeuroProofSolver:
                 self._interpolator.register_original(
                     idx, clause_db[idx], source)
 
-        # Level-0 unit propagation
+        # Level-0 unit propagation: proactively detect unit clauses
+        # (WatchedLiterals.propagate is trail-driven, but the trail is
+        #  empty at this point, so we must seed it with unit clauses.)
+        level0_queue: List[Tuple[str, bool, int]] = []
+        for idx, clause in enumerate(clause_db):
+            clist = list(clause)
+            if len(clist) == 1:
+                v, is_pos = clist[0]
+                if assignment.value(v) is None:
+                    level0_queue.append((v, is_pos, idx))
+
+        while level0_queue:
+            v, is_pos, reason_idx = level0_queue.pop(0)
+            if assignment.value(v) is not None:
+                continue  # already assigned, skip
+            assignment.assign(v, is_pos, reason=reason_idx)
+            reason_map[v] = reason_idx
+            stats['unit_props'] += 1
+            # Check clauses watching the false version of this literal
+            false_lit = (v, not is_pos)
+            if false_lit in wl._watch:
+                for cidx, wpos in list(wl._watch.get(false_lit, [])):
+                    if cidx >= len(clause_db):
+                        continue
+                    clause = clause_db[cidx]
+                    # Count unassigned literals
+                    unassigned_count = 0
+                    last_unassigned = None
+                    is_satisfied = False
+                    for lit in clause:
+                        ev = assignment.evaluate(lit)
+                        if ev is True:
+                            is_satisfied = True
+                            break
+                        if ev is None:
+                            unassigned_count += 1
+                            last_unassigned = lit
+                    if is_satisfied:
+                        continue
+                    if unassigned_count == 0:
+                        # Conflict at level 0 → UNSAT
+                        return SolverResult(
+                            status=SolverStatus.UNSAT,
+                            proof=self._build_resolution_proof(
+                                clause_db, learned_origins),
+                            stats=stats, time_sec=time.perf_counter() - t0)
+                    if unassigned_count == 1 and last_unassigned is not None:
+                        nv, npos = last_unassigned
+                        if assignment.value(nv) is None:
+                            level0_queue.append((nv, npos, cidx))
+
+        # Now run WatchedLiterals propagation for any remaining consequences
         wl.reset_propagation_counter()
         conflict = wl.propagate(clause_db, assignment, reason_map, stats)
         if conflict is not None:
@@ -969,10 +1025,10 @@ class NeuroProofSolver:
                 else:
                     lemma_f = Bot
                 self._atss.store_lemma(ProofStep(
-                    rule_name="LEARNED_CLAUSE",
+                    rule=Rule.LEMMA_LEARN,
                     premises=[],
                     conclusion=lemma_f,
-                    depth=1))
+                    annotation="Learned clause promoted to ND lemma"))
 
                 # Virtuous cycle: also store interpolation result as cut formula
                 if self._interpolator is not None:
@@ -980,10 +1036,10 @@ class NeuroProofSolver:
                         learned_clause_idx)
                     if interpolant is not None:
                         self._atss.store_lemma(ProofStep(
-                            rule_name="INTERPOLATION_GUIDED_CUT",
+                            rule=Rule.INTERPOLATION_GUIDED_CUT,
                             premises=[],
                             conclusion=interpolant,
-                            depth=1))
+                            annotation="Interpolation-guided cut lemma"))
 
                 # Backjump
                 assignment.pop_to_level(backjump_level)
