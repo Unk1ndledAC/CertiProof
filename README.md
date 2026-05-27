@@ -50,8 +50,7 @@ See [EXPERIMENTS.md](EXPERIMENTS.md) for detailed documentation.
 
 ```bash
 pip install matplotlib numpy pandas
-python experiments/plot_results.py
-# Or generate all 12 figures at once:
+# Generate all 12 figures at once:
 python experiments/plot_all_figures.py
 ```
 
@@ -79,7 +78,6 @@ NeuroProof/
 │   ├── benchmark_suite.py        # Full benchmark suite (9 core experiments)
 │   ├── generate_all_data.py      # Generate all 12 experiment CSV datasets
 │   ├── plot_all_figures.py       # Generate all 12 publication-quality figures
-│   ├── plot_results.py           # Publication-quality plot generation (original)
 │   ├── results.csv               # Quick test results
 │   ├── results/                  # 12 experiment CSV datasets
 │   │   ├── exp1_classical_tautologies.csv
@@ -106,27 +104,18 @@ NeuroProof/
 │       ├── fig9_atss_learning.pdf
 │       ├── fig10_virtuous_cycle.pdf
 │       ├── fig11_frege_extension.pdf
-│       ├── fig12_operation_costs.pdf
-│       └── ... (legacy PNG + detailed CSVs)
-├── scripts/
-│   ├── run_all_experiments.py
-│   ├── run_exp1_phase_transition.py
-│   ├── run_exp2_pigeonhole.py
-│   ├── run_exp3_tseitin.py
-│   ├── run_exp4_tautologies.py
-│   └── run_exp5_atss_learning.py
+│       └──  fig12_operation_costs.pdf
 ├── coq/
 │   └── NeuroProof.v              # Rocq 9.0 formalisation (1171 lines)
 ├── paper/
-│   ├── neuroproof.tex            # LICS/CAV formatted paper (IEEEtran, 11 pages)
-│   ├── cover_letter.tex          # Cover letter for CAV 2027 / CPP 2027 submission
+│   ├── neuroproof.tex            # IEEEtrans formatted paper
+│   ├── cover_letter.tex          # Cover letter for submission
 │   ├── references.bib            # Bibliography (50+ entries)
 │   ├── IEEEtran.cls              # IEEE style
 │   └── IEEEbib.bst               # IEEE bibliography style
 ├── verify_installation.py        # Quick smoke test
 ├── requirements.txt              # Python dependencies
 ├── EXPERIMENTS.md                # Detailed experiment reproduction guide
-├── Evaluation.md                 # Comprehensive project evaluation
 ├── LICENSE                       # MIT License
 └── README.md
 ```
@@ -260,35 +249,16 @@ Pudlák's resolution-based interpolation algorithm with incremental computation:
 
 Operation-primitive analysis is a methodology for fair benchmarking across solvers implemented in different languages. Instead of comparing wall-clock time directly (which conflates algorithmic efficiency with implementation language overhead), it decomposes solver execution into **operation primitives** — atomic operations like clause visits, variable assignments, and BCP propagations — and counts each primitive as a single time unit. This eliminates the ~200× Python/C++ speed gap and reveals that NeuroProof's CDCL algorithm performs comparably to industrial solvers at the algorithmic level. EXP-3 through EXP-12 use this methodology to produce theoretically derived data.
 
-## Paper
-
-The accompanying paper is formatted for LICS/CAV (IEEEtran, 11 pages):
-
-```
-paper/
-├── neuroproof.tex      # Main manuscript (82KB, 1837 lines)
-├── references.bib      # Bibliography (50+ entries)
-├── IEEEtran.cls         # IEEE style
-├── IEEEbib.bst          # IEEE bibliography style
-└── neuroproof.pdf       # Compiled PDF (476KB)
-```
-
 ### Key Theorems
 
-| Theorem | Statement | Proof |
-|---|---|---|
-| Soundness (Thm 1) | $\Gamma \vdash \varphi \Rightarrow \Gamma \vDash \varphi$ | Structural induction, Rocq verified |
-| Completeness (Thm 2) | NP p-simulates Frege | Frege→ND→SC→NP translation |
-| Kalmár Completeness (Thm 3) | Every tautology has pure ND proof | Constructive induction on variables |
-| ATSS Regret (Thm 4) | $\mathbb{E}[\text{Regret}_T] \leq 2\sqrt{(e-1)KT\ln K} + O(\ln K)$ | Potential analysis + Azuma-Hoeffding |
-| Incremental Interpolation (Thm 5) | Incremental ≡ post-hoc Pudlák | Structural induction on CDCL trace |
-| DAG Compression (Thm 6) | $|\Pi'| \leq s - \Omega(\log s)$ | Duplication count analysis |
-
-## Project Evaluation
-
-A comprehensive evaluation of the project across Originality, Significance, Technical Quality, and Presentation dimensions is available in [Evaluation.md](Evaluation.md).
-
-**Overall score**: 3.875 / 5 (Accept / Weak Accept+)
+| Theorem                           | Statement                                                    | Proof                                                        |
+| --------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Soundness (Thm 1)                 | $ \Gamma \vdash \varphi \Rightarrow \Gamma \vDash \varphi $  | Structural induction on derivation tree; Mechanically verified in Rocq |
+| Completeness (Thm 2)              | $ \text{NP} $  p-simulates Frege                             | Translation: Frege  $ \to $  ND  $ \to $  Sequent Calculus  $ \to $  NP |
+| Kalmár Completeness (Thm 3)       | Every tautology has a pure ND proof                          | Constructive induction on variables (Kalmár's method)        |
+| ATSS Regret (Thm 4)               | $ \mathbb{E}[\text{Regret}_T] \leq 2\sqrt{(e-1)KT\ln K} + O(\ln K) $ | Potential analysis + Azuma-Hoeffding inequality              |
+| Incremental Interpolation (Thm 5) | Incremental  $ \equiv $  post-hoc Pudlák                     | Structural induction on CDCL resolution trace                |
+| DAG Compression (Thm 6)           | $ \|Pi'\|<= s - \Omega(log s) $                              | Counting argument on duplicated subproofs (Lemma reuse)      |
 
 ## Citation
 
@@ -299,6 +269,7 @@ This project was archived in Zenodo [![DOI](https://zenodo.org/badge/1230812812.
   title={NeuroProof: A Hybrid Propositional Proof System with
          Adaptive Tactic Synthesis and Certified Proof Checking},
   author={Qu, Guanheng and Zhang, Chunxiao and Liu, Jiangming},
+  journal={},
   year={2026},
   doi={10.5281/zenodo.20382686}
 }
