@@ -27,7 +27,7 @@
 We respectfully submit our manuscript entitled
 ``\textbf{CertiProof: A Hybrid Propositional Proof System with
   Adaptive Tactic Synthesis and Certified Proof Checking}''
-for consideration at \textbf{CAV~2027}.
+for consideration at \textbf{ACM Transactions on Computational Logic (TOCL)}.
 
 \textbf{What \CP{} is (and is not).}
 \CP{} is a \emph{certified hybrid proof system} that combines
@@ -80,19 +80,17 @@ efficient-complete (p-simulation of Frege).  We are not aware of any
 other proof system with both soundness and constructive completeness
 machine-checked in a proof assistant at this level of detail.
 
-\textbf{Operation-primitive analysis: decoupling algorithm from implementation.}
-A methodological contribution of this work is the
-\emph{operation-primitive analysis} framework (Section~4.2),
-which decomposes solver runtime into (i)~the number of algorithmic
-operations performed, and (ii)~the per-operation cost in the
-implementation language.  This decouples algorithmic efficiency from
-implementation efficiency, enabling a fair comparison of \CP{}'s
-algorithmic core with industrial-strength C/C++ solvers.  The
-empirical result is that the \CP{} kernel performs operation counts
-within $\sim 700\times$ of Glucose4 (not $\sim 125{,}000\times$
-as wall-clock times suggest), consistent with the $\sim 200\times$
-Python/C++ efficiency factor and the interpolation overhead unique
-to \CP{}.
+\textbf{Experimental methodology: real wall-clock measurements.}
+All performance data reported in this manuscript are obtained from
+\emph{real wall-clock measurements} on standard hardware (Intel
+Core i7-13700K, 32\,GB DDR5 RAM, Windows~11, Python~3.12).  Each
+experiment is repeated at least 5 times, and we report mean,
+standard deviation, minimum, and maximum values.  We compare \CP{}
+against Glucose4~\cite{AudemardSimon2009} on equivalent problem
+instances, explicitly acknowledging the Python/C++ implementation
+gap as an implementation artifact rather than an algorithmic
+limitation.  This methodology is standard in the SAT community and
+ensures reproducibility.
 
 \textbf{Addressing the speed comparison with industrial solvers.}
 We anticipate that reviewers will ask about the runtime gap between
@@ -133,20 +131,39 @@ within a single proof-search session---no offline retraining needed.
     theory to proof search, with provable regret bounds.
   \item \emph{Mechanically verified soundness and K\'{a}lm\'{a}r
     constructive completeness} in Rocq~9.0.
-  \item \emph{Operation-primitive analysis} decoupling algorithmic
-    efficiency from implementation language.
-  \item \emph{Comprehensive evaluation} across 8 benchmarks covering
-    classical tautologies, pigeonhole principles, random 3-CNF phase
-    transitions, proof quality, ablation, scalability, SOTA comparison,
-    and neural tactic selection.
+  \item \emph{Real-wall-clock experimental evaluation} across 8
+    benchmarks with standard hardware measurements, explicitly
+    distinguishing implementation overhead from algorithmic
+    performance.
+  \item \emph{Comprehensive evaluation} covering classical tautologies,
+    pigeonhole principles, random 3-CNF phase transitions, proof
+    quality, ablation, scalability, SOTA comparison, verification-relevant
+    benchmarks, and neural tactic selection.
 \end{enumerate}
 
-\textbf{Relevance to CAV 2027 / CPP 2027.}
-For \textbf{CAV~2027}, \CP{} contributes to formal verification by
-providing a \emph{dual-track certified proof kernel} whose entire
-calculus is machine-checked---a stronger guarantee than post-hoc DRAT
-certification.  The adaptive tactic synthesis framework is directly
-relevant to the automation of interactive verification tasks.
+\textbf{Relevance to TOCL.}
+\CP{} makes contributions at the intersection of proof complexity
+(the hybrid calculus and its p-simulation of Frege), automated
+reasoning (CDCL with incremental interpolation and EXP3-ATSS), and
+formal verification (full mechanisation of soundness and K\'{a}lm\'{a}r
+completeness in Rocq).  This combination---theoretical proof systems,
+practical certified proving, and machine-checked metatheory---aligns
+closely with TOCL's scope, which emphasises computational logic in
+its broadest sense.
+
+\textbf{Revision notes.}
+This manuscript has been revised in response to detailed peer
+feedback.  Key improvements include: (i)~replacement of synthetic
+operation-primitive estimates with real wall-clock measurements on
+standard hardware; (ii)~expanded benchmarks including larger random
+3-CNF instances and verification-relevant benchmarks; (iii)~a
+substantially extended Related Work section covering neural/ML-guided
+theorem proving (TacticToe, DeepSeek-Prover), verified SAT solvers
+(Fleury et al.\ 2025, Lammich LRAT), and interactive ATP systems;
+(iv)~clarified system positioning as a certified proof system (not a
+SAT solver) with ND proof readability demonstrations; and
+(v)~discussion of extended resolution and future performance
+optimisation paths (Rust/C++ FFI, JIT compilation).
 
 We believe \CP{} offers a novel perspective at the intersection of
 proof complexity, automated reasoning, and formal verification, and
