@@ -61,6 +61,7 @@ COLORS = {
     'NP+ATSS+Ext': '#1f77b4',
     'DPLL-Baseline': '#ff7f0e',
     'Glucose4': '#2ca02c',
+    'Glucose4 (est.)': '#2ca02c',
     'CertiProof-noATSS': '#d62728',
     'noATSS': '#d62728',
     'without_ATSS': '#d62728',
@@ -106,13 +107,13 @@ def plot_fig1_classical_tautologies():
     formulas_unique = list(dict.fromkeys(df['formula'].tolist()))
     atss_mask = df['time_us'] <= 1000  # ATSS uses measured times (<= 944us)
 
-    fig, ax = plt.subplots(figsize=(16, 5))
+    fig, ax = plt.subplots(figsize=(16, 5), constrained_layout=True)
 
     x = np.arange(len(formulas_unique))
     width = 0.35
 
     # Short labels for display
-    short_labels = [f if len(f) <= 20 else f[:17] + '...' for f in formulas_unique]
+    short_labels = [f if len(f) <= 22 else f[:19] + '...' for f in formulas_unique]
 
     # Collect data per formula
     sizes_atss = []
@@ -139,11 +140,10 @@ def plot_fig1_classical_tautologies():
     ax.set_xlabel('Formula')
     #ax.set_title('Fig 1: Classical Tautology Proof Sizes (ATSS vs noATSS)')
     ax.set_xticks(x)
-    ax.set_xticklabels(short_labels, rotation=35, ha='right', fontsize=7)
+    ax.set_xticklabels(short_labels, rotation=45, ha='right', fontsize=7)
     ax.legend(loc='upper left')
     ax.set_ylim(0, max(sizes_atss + sizes_noatss) * 1.2)
 
-    fig.tight_layout()
     _save(fig, 'fig1_classical_tautologies.pdf')
 
 
@@ -152,19 +152,22 @@ def plot_fig1_classical_tautologies():
 # ==============================================================================
 
 def plot_fig2_pigeonhole():
-    """2-panel: (a) time vs n (log scale), (b) solve rate vs n."""
+    """2-panel: (a) time vs n (log scale), (b) status vs n."""
     df = _read_csv('exp2_pigeonhole.csv')
     if df is None:
         return
 
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+    # Use actual solver names from data
+    available_solvers = sorted(df['solver'].unique().tolist())
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5), constrained_layout=True)
 
     # Panel (a): Time vs n (log scale)
     ax = axes[0]
-    for solver in ['NP+ATSS', 'DPLL-Baseline', 'Glucose4']:
+    for solver in available_solvers:
         grp = df[df['solver'] == solver].sort_values('n')
         ax.semilogy(grp['n'], grp['time_s'] * 1000, 'o-',
-                    color=COLORS.get(solver, 'gray'),
+                    color=COLORS.get(solver, '#1f77b4'),
                     label=solver, linewidth=1.8, markersize=7)
 
     ax.set_xlabel('n (PHP_n^{n+1})')
@@ -174,25 +177,23 @@ def plot_fig2_pigeonhole():
     ax.set_xticks([2, 3, 4, 5, 6])
     ax.grid(alpha=0.3, which='both')
 
-    # Panel (b): Solve rate vs n
+    # Panel (b): Status overview
     ax2 = axes[1]
-    for solver in ['NP+ATSS', 'DPLL-Baseline', 'Glucose4']:
+    for solver in available_solvers:
         grp = df[df['solver'] == solver].sort_values('n')
         rates = [100 if s in ['UNSAT', 'SAT'] else 0 for s in grp['status']]
         ax2.plot(grp['n'], rates, 's-',
-                 color=COLORS.get(solver, 'gray'),
+                 color=COLORS.get(solver, '#1f77b4'),
                  label=solver, linewidth=1.8, markersize=8)
 
     ax2.set_xlabel('n (PHP_n^{n+1})')
     ax2.set_ylabel('Solve Rate (%)')
-    ax2.set_title('(b) PHP Solve Rate')
+    ax2.set_title('(b) PHP Status (SAT/UNSAT)')
     ax2.legend(loc='lower left', fontsize=9)
     ax2.set_xticks([2, 3, 4, 5, 6])
     ax2.set_ylim(-5, 115)
     ax2.grid(alpha=0.3)
 
-    #fig.suptitle('Figure 2: Pigeonhole Principle Performance', fontsize=14, y=1.01)
-    fig.tight_layout()
     _save(fig, 'fig2_pigeonhole.pdf')
 
 
@@ -206,11 +207,14 @@ def plot_fig3_phase_transition():
     if df is None:
         return
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    # Use actual solver names from data
+    available_solvers = sorted(df['solver'].unique().tolist())
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
 
     # Panel (a): Median time vs ratio
     ax = axes[0]
-    for solver in ['NP+ATSS', 'DPLL-Baseline', 'Glucose4']:
+    for solver in available_solvers:
         grp = df[df['solver'] == solver]
         ratios_sorted = sorted(grp['ratio'].unique())
         medians = []
@@ -236,7 +240,7 @@ def plot_fig3_phase_transition():
 
     # Panel (b): Solve rate vs ratio
     ax2 = axes[1]
-    for solver in ['NP+ATSS', 'DPLL-Baseline', 'Glucose4']:
+    for solver in available_solvers:
         grp = df[df['solver'] == solver]
         ratios_sorted = sorted(grp['ratio'].unique())
         rates = []
@@ -256,8 +260,6 @@ def plot_fig3_phase_transition():
     ax2.set_ylim(-0.05, 1.15)
     ax2.grid(alpha=0.3)
 
-    #fig.suptitle('Figure 3: Phase Transition at n=20', fontsize=14, y=1.01)
-    fig.tight_layout()
     _save(fig, 'fig3_phase_transition.pdf')
 
 
@@ -271,9 +273,9 @@ def plot_fig4_proof_quality():
     if df is None:
         return
 
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4.5))
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.5), constrained_layout=True)
 
-    formulas_short = [f if len(f) <= 14 else f[:11] + '...'
+    formulas_short = [f if len(f) <= 18 else f[:15] + '...'
                       for f in df[df['solver'] == 'ATSS']['formula'].unique()]
     n_formulas = len(formulas_short)
 
@@ -288,7 +290,7 @@ def plot_fig4_proof_quality():
     ax.bar(x + width/2, noatss_sizes, width, color=COLORS['noATSS'], alpha=0.85,
            label='noATSS', edgecolor='black', linewidth=0.3)
     ax.set_xticks(x)
-    ax.set_xticklabels(formulas_short, rotation=45, ha='right', fontsize=6)
+    ax.set_xticklabels(formulas_short, rotation=60, ha='right', fontsize=6)
     ax.set_ylabel('Proof Size')
     ax.set_title('(a) Proof Size')
     ax.legend(fontsize=8)
@@ -302,7 +304,7 @@ def plot_fig4_proof_quality():
     ax2.bar(x + width/2, noatss_depths, width, color=COLORS['noATSS'], alpha=0.85,
             label='noATSS', edgecolor='black', linewidth=0.3)
     ax2.set_xticks(x)
-    ax2.set_xticklabels(formulas_short, rotation=45, ha='right', fontsize=6)
+    ax2.set_xticklabels(formulas_short, rotation=60, ha='right', fontsize=6)
     ax2.set_ylabel('Proof Depth')
     ax2.set_title('(b) Proof Depth')
     ax2.legend(fontsize=8)
@@ -316,13 +318,11 @@ def plot_fig4_proof_quality():
     ax3.bar(x + width/2, noatss_times, width, color=COLORS['noATSS'], alpha=0.85,
             label='noATSS', edgecolor='black', linewidth=0.3)
     ax3.set_xticks(x)
-    ax3.set_xticklabels(formulas_short, rotation=45, ha='right', fontsize=6)
+    ax3.set_xticklabels(formulas_short, rotation=60, ha='right', fontsize=6)
     ax3.set_ylabel('Time (us)')
     ax3.set_title('(c) Solve Time')
     ax3.legend(fontsize=8)
 
-    #fig.suptitle('Figure 4: ATSS vs noATSS Proof Quality', fontsize=14, y=1.02)
-    fig.tight_layout()
     _save(fig, 'fig4_proof_quality.pdf')
 
 
@@ -337,31 +337,34 @@ def plot_fig5_ablation():
         return
 
     difficulties = ['Easy', 'Phase', 'Hard']
-    solvers = ['NP+ATSS', 'DPLL-Baseline', 'Glucose4']
-    solver_colors = [COLORS[s] for s in solvers]
+    # Use actual solver names from data
+    available_solvers = sorted(df['solver'].unique().tolist())
+    solver_colors = [COLORS.get(s, '#1f77b4') for s in available_solvers]
+    n_solvers = len(available_solvers)
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), constrained_layout=True)
 
     # Panel (a): Median time
     ax = axes[0]
     x = np.arange(len(difficulties))
-    width = 0.25
-    for i, solver in enumerate(solvers):
+    width = 0.8 / max(n_solvers, 1)
+    for i, solver in enumerate(available_solvers):
         grp = df[df['solver'] == solver]
         times = []
         for d in difficulties:
             sub = grp[grp['difficulty'] == d]
             times.append(np.median(sub['time_s'] * 1000) if len(sub) > 0 else 0)
-        ax.bar(x + i * width, times, width, color=solver_colors[i],
+        offset = (i - (n_solvers - 1) / 2) * width if n_solvers > 1 else 0
+        ax.bar(x + offset, times, width, color=solver_colors[i],
                alpha=0.85, label=solver, edgecolor='black', linewidth=0.5)
         # Add value labels
         for j, t in enumerate(times):
             if t > 0:
-                ax.text(x[j] + i * width, t + max(times)*0.02,
+                ax.text(x[j] + offset, t + max(times)*0.02,
                         f'{t:.1f}', ha='center', va='bottom',
                         fontsize=7, rotation=90)
 
-    ax.set_xticks(x + width)
+    ax.set_xticks(x)
     ax.set_xticklabels(difficulties)
     ax.set_ylabel('Median Time (ms)')
     ax.set_title('(a) Solve Time')
@@ -370,16 +373,17 @@ def plot_fig5_ablation():
 
     # Panel (b): Solve rate
     ax2 = axes[1]
-    for i, solver in enumerate(solvers):
+    for i, solver in enumerate(available_solvers):
         grp = df[df['solver'] == solver]
         rates = []
         for d in difficulties:
             sub = grp[grp['difficulty'] == d]
             avg_rate = sub['solve_rate'].mean() if len(sub) > 0 else 0
             rates.append(avg_rate * 100)
-        ax2.bar(x + i * width, rates, width, color=solver_colors[i],
+        offset = (i - (n_solvers - 1) / 2) * width if n_solvers > 1 else 0
+        ax2.bar(x + offset, rates, width, color=solver_colors[i],
                 alpha=0.85, label=solver, edgecolor='black', linewidth=0.5)
-    ax2.set_xticks(x + width)
+    ax2.set_xticks(x)
     ax2.set_xticklabels(difficulties)
     ax2.set_ylabel('Solve Rate (%)')
     ax2.set_title('(b) Solve Rate')
@@ -388,23 +392,22 @@ def plot_fig5_ablation():
 
     # Panel (c): Conflicts
     ax3 = axes[2]
-    for i, solver in enumerate(solvers):
+    for i, solver in enumerate(available_solvers):
         grp = df[df['solver'] == solver]
         conflicts = []
         for d in difficulties:
             sub = grp[grp['difficulty'] == d]
             conflicts.append(np.median(sub['conflicts']) if len(sub) > 0 else 0)
-        ax3.bar(x + i * width, conflicts, width, color=solver_colors[i],
+        offset = (i - (n_solvers - 1) / 2) * width if n_solvers > 1 else 0
+        ax3.bar(x + offset, conflicts, width, color=solver_colors[i],
                 alpha=0.85, label=solver, edgecolor='black', linewidth=0.5)
-    ax3.set_xticks(x + width)
+    ax3.set_xticks(x)
     ax3.set_xticklabels(difficulties)
     ax3.set_ylabel('Median Conflicts')
     ax3.set_title('(c) Conflicts')
     ax3.set_yscale('log')
     ax3.legend(fontsize=8)
 
-    #fig.suptitle('Figure 5: Ablation Study Across Difficulty Levels', fontsize=14, y=1.02)
-    fig.tight_layout()
     _save(fig, 'fig5_ablation.pdf')
 
 
@@ -418,11 +421,14 @@ def plot_fig6_scalability():
     if df is None:
         return
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    # Use actual solver names from data
+    available_solvers = sorted(df['solver'].unique().tolist())
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
 
     # Panel (a): Time vs n_vars with IQR
     ax = axes[0]
-    for solver in ['NP+ATSS', 'DPLL-Baseline', 'Glucose4']:
+    for solver in available_solvers:
         grp = df[df['solver'] == solver]
         n_sorted = sorted(grp['n_vars'].unique())
         medians = []
@@ -433,7 +439,7 @@ def plot_fig6_scalability():
             medians.append(np.median(times))
             q25s.append(np.percentile(times, 25))
             q75s.append(np.percentile(times, 75))
-        color = COLORS.get(solver, 'gray')
+        color = COLORS.get(solver, '#1f77b4')
         ax.semilogy(n_sorted, medians, 'o-', color=color, label=solver,
                     linewidth=2, markersize=6)
         ax.fill_between(n_sorted, q25s, q75s, color=color, alpha=0.15)
@@ -446,14 +452,14 @@ def plot_fig6_scalability():
 
     # Panel (b): Conflicts vs n_vars
     ax2 = axes[1]
-    for solver in ['NP+ATSS', 'DPLL-Baseline', 'Glucose4']:
+    for solver in available_solvers:
         grp = df[df['solver'] == solver]
         n_sorted = sorted(grp['n_vars'].unique())
         medians_c = []
         for n_v in n_sorted:
             conflicts = grp[grp['n_vars'] == n_v]['conflicts']
             medians_c.append(np.median(conflicts))
-        color = COLORS.get(solver, 'gray')
+        color = COLORS.get(solver, '#1f77b4')
         ax2.semilogy(n_sorted, medians_c, 's-', color=color, label=solver,
                      linewidth=2, markersize=6)
 
@@ -463,8 +469,6 @@ def plot_fig6_scalability():
     ax2.legend(fontsize=9)
     ax2.grid(alpha=0.3, which='both')
 
-    #fig.suptitle('Figure 6: Scalability at Phase Transition', fontsize=14, y=1.01)
-    fig.tight_layout()
     _save(fig, 'fig6_scalability.pdf')
 
 
@@ -478,25 +482,29 @@ def plot_fig7_sota_comparison():
     if df is None:
         return
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+    # Use actual solver names from data
+    available_solvers = sorted(df['solver'].unique().tolist())
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5), constrained_layout=True)
 
     # Panel (a): Time comparison (grouped bar)
     ax = axes[0]
     benchmarks = df['benchmark'].unique()
-    solvers = ['NP+ATSS', 'DPLL-Baseline', 'Glucose4']
+    n_solvers = len(available_solvers)
     x = np.arange(len(benchmarks))
-    width = 0.25
+    width = 0.8 / max(n_solvers, 1)
 
-    for i, solver in enumerate(solvers):
+    for i, solver in enumerate(available_solvers):
         grp = df[df['solver'] == solver]
         times = []
         for b in benchmarks:
             sub = grp[grp['benchmark'] == b]
             times.append(sub['time_s'].values[0] * 1000 if len(sub) > 0 else 0)
-        ax.bar(x + i * width, times, width, color=COLORS.get(solver, 'gray'),
+        offset = (i - (n_solvers - 1) / 2) * width if n_solvers > 1 else 0
+        ax.bar(x + offset, times, width, color=COLORS.get(solver, '#1f77b4'),
                alpha=0.85, label=solver, edgecolor='black', linewidth=0.5)
 
-    ax.set_xticks(x + width)
+    ax.set_xticks(x)
     ax.set_xticklabels(benchmarks, rotation=30, ha='right', fontsize=8)
     ax.set_ylabel('Solve Time (ms, log)')
     ax.set_title('(a) SOTA Time Comparison')
@@ -509,7 +517,7 @@ def plot_fig7_sota_comparison():
     for b in benchmarks:
         sub_cert = df[(df['benchmark'] == b) & (df['certified'] == True)]
         cert_counts.append(len(sub_cert))
-    bars = ax2.bar(range(len(benchmarks)), cert_counts, color=COLORS['NP+ATSS'],
+    bars = ax2.bar(range(len(benchmarks)), cert_counts, color=COLORS.get('CertiProof+ATSS', '#1f77b4'),
                    alpha=0.85, edgecolor='black', linewidth=0.5)
     ax2.set_xticks(range(len(benchmarks)))
     ax2.set_xticklabels(benchmarks, rotation=30, ha='right', fontsize=8)
@@ -517,8 +525,6 @@ def plot_fig7_sota_comparison():
     ax2.set_title('(b) Certified Proof Output')
     ax2.set_ylim(0, 4)
 
-    #fig.suptitle('Figure 7: SOTA Comparison', fontsize=14, y=1.01)
-    fig.tight_layout()
     _save(fig, 'fig7_sota_comparison.pdf')
 
 
@@ -532,7 +538,7 @@ def plot_fig8_gnn_atss():
     if df is None:
         return
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), constrained_layout=True)
 
     configs = ['Cosine', 'GNN', 'Blended']
     complexities = ['Small', 'Medium', 'Large']
@@ -589,8 +595,6 @@ def plot_fig8_gnn_atss():
     ax3.set_title('(c) Proof Size')
     ax3.legend(fontsize=8)
 
-    #fig.suptitle('Figure 8: GNN-ATSS Configuration Comparison', fontsize=14, y=1.02)
-    fig.tight_layout()
     _save(fig, 'fig8_gnn_atss.pdf')
 
 
@@ -604,7 +608,7 @@ def plot_fig9_atss_learning():
     if df is None:
         return
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), constrained_layout=True)
 
     # Panel (a): Solve rate convergence
     ax = axes[0]
@@ -654,8 +658,6 @@ def plot_fig9_atss_learning():
     ax3.legend(fontsize=9)
     ax3.grid(alpha=0.3)
 
-    #fig.suptitle('Figure 9: ATSS Online Learning Curve', fontsize=14, y=1.02)
-    fig.tight_layout()
     _save(fig, 'fig9_atss_learning.pdf')
 
 
@@ -669,7 +671,7 @@ def plot_fig10_virtuous_cycle():
     if df is None:
         return
 
-    fig = plt.figure(figsize=(12, 8))
+    fig = plt.figure(figsize=(12, 8), constrained_layout=True)
 
     # Layout: 2x2 subplots
     ax1 = fig.add_subplot(2, 2, 1)
@@ -678,67 +680,62 @@ def plot_fig10_virtuous_cycle():
     ax4 = fig.add_subplot(2, 2, 4)
 
     cycles = df['cycle'].values
+    n_vars = df['n_vars'].values
 
-    # (a) CDCL Conflicts decreasing
+    # (a) CDCL Conflicts across cycles
     ax1.plot(cycles, df['cdcl_conflicts'], 'o-', color='#d62728',
              linewidth=2, markersize=7, label='CDCL Conflicts')
     ax1.fill_between(cycles, df['cdcl_conflicts'], alpha=0.2, color='#d62728')
     ax1.set_xlabel('Cycle')
     ax1.set_ylabel('Conflicts')
-    ax1.set_title('(a) CDCL Conflicts (decreasing)')
+    ax1.set_title('(a) CDCL Conflicts vs Cycle')
     ax1.grid(alpha=0.3)
     ax1.legend(fontsize=9)
 
-    # (b) Lemmas and Interpolants growing
-    ax2.plot(cycles, df['lemmas_stored'], 'o-', color='#1f77b4',
-             linewidth=2, markersize=7, label='Lemmas Stored')
-    ax2.plot(cycles, df['interpolants_extracted'], 's--', color='#2ca02c',
-             linewidth=2, markersize=7, label='Interpolants Extracted')
+    # (b) Lemmas learned and ATSS success
+    ax2.plot(cycles, df['lemmas_learned'], 'o-', color='#1f77b4',
+             linewidth=2, markersize=7, label='Lemmas Learned')
+    ax2.plot(cycles, df['atss_success_rate'] * 100, 's--', color='#2ca02c',
+             linewidth=2, markersize=7, label='ATSS Success Rate (%)')
     ax2.set_xlabel('Cycle')
-    ax2.set_ylabel('Count')
+    ax2.set_ylabel('Count / Rate (%)')
     ax2.set_title('(b) Knowledge Accumulation')
     ax2.grid(alpha=0.3)
     ax2.legend(fontsize=9)
 
-    # (c) ATSS Success Rate improving
-    ax3.plot(cycles, df['atss_success_rate'] * 100, 'o-', color='#ff7f0e',
-             linewidth=2, markersize=7, label='ATSS Success Rate')
-    ax3.fill_between(cycles, df['atss_success_rate'] * 100, alpha=0.2,
-                     color='#ff7f0e')
+    # (c) Problem complexity (n_vars) per cycle
+    ax3.bar(cycles, n_vars, color='#ff7f0e', alpha=0.85,
+            edgecolor='black', linewidth=0.5, label='Variables')
     ax3.set_xlabel('Cycle')
-    ax3.set_ylabel('Success Rate (%)')
-    ax3.set_title('(c) ATSS Success Rate (improving)')
-    ax3.set_ylim(0, 110)
-    ax3.grid(alpha=0.3)
+    ax3.set_ylabel('Number of Variables')
+    ax3.set_title('(c) Problem Scale per Cycle')
+    ax3.grid(alpha=0.3, axis='y')
     ax3.legend(fontsize=9)
 
-    # (d) Combined virtuous cycle spiral
-    # Scatter plot showing the relationship
-    ax4.scatter(df['cdcl_conflicts'], df['proof_quality_score'],
-                c=cycles, cmap='viridis', s=150, edgecolors='black',
-                linewidth=0.5, zorder=3)
+    # (d) Scatter: Conflicts vs ATSS Success Rate
+    scatter = ax4.scatter(df['cdcl_conflicts'], df['atss_success_rate'] * 100,
+                          c=cycles, cmap='viridis', s=150, edgecolors='black',
+                          linewidth=0.5, zorder=3)
     for i, cycle in enumerate(cycles):
         ax4.annotate(str(cycle),
                      (df['cdcl_conflicts'].values[i],
-                      df['proof_quality_score'].values[i]),
+                      df['atss_success_rate'].values[i] * 100),
                      textcoords="offset points", xytext=(8, 5),
                      fontsize=8, fontweight='bold')
     # Draw arrows showing progression
     for i in range(len(cycles) - 1):
         ax4.annotate('', xy=(df['cdcl_conflicts'].values[i + 1],
-                              df['proof_quality_score'].values[i + 1]),
+                              df['atss_success_rate'].values[i + 1] * 100),
                      xytext=(df['cdcl_conflicts'].values[i],
-                             df['proof_quality_score'].values[i]),
+                             df['atss_success_rate'].values[i] * 100),
                      arrowprops=dict(arrowstyle='->', color='gray',
                                      lw=1.5, alpha=0.6))
     ax4.set_xlabel('CDCL Conflicts')
-    ax4.set_ylabel('Proof Quality Score')
+    ax4.set_ylabel('ATSS Success Rate (%)')
     ax4.set_title('(d) Virtuous Cycle Trajectory')
     cbar = plt.colorbar(ax4.collections[0], ax=ax4, label='Cycle')
     ax4.grid(alpha=0.3)
 
-    #fig.suptitle('Figure 10: Virtuous Cycle — CDCL to ATSS Feedback Loop', fontsize=14, y=1.01)
-    fig.tight_layout()
     _save(fig, 'fig10_virtuous_cycle.pdf')
 
 
@@ -752,7 +749,7 @@ def plot_fig11_frege_extension():
     if df is None:
         return
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
 
     # Separate standard and extension data
     std = df[~df['benchmark'].str.contains('_ext')]
@@ -804,8 +801,6 @@ def plot_fig11_frege_extension():
     ax2.legend(fontsize=9)
     ax2.grid(alpha=0.3, axis='y')
 
-    #fig.suptitle('Figure 11: Extended Frege Resolution (Polynomial Speedup)', fontsize=14, y=1.01)
-    fig.tight_layout()
     _save(fig, 'fig11_frege_extension.pdf')
 
 
@@ -832,7 +827,7 @@ def plot_fig12_operation_costs():
     python_costs = [0.8, 5.0, 50.0, 30.0, 10.0, 2.0, 3.0, 50.0, 0.5, 2.0, 5.0, 3.0]
     c_costs = [c * (1.0/200.0) for c in python_costs]
 
-    fig, ax = plt.subplots(figsize=(12, 5.5))
+    fig, ax = plt.subplots(figsize=(12, 5.5), constrained_layout=True)
 
     x = np.arange(len(operations))
     width = 0.35
@@ -860,8 +855,217 @@ def plot_fig12_operation_costs():
     ax.set_ylim(top=max(python_costs) * 3)
     ax.grid(alpha=0.3, axis='y')
 
-    fig.tight_layout()
     _save(fig, 'fig12_operation_costs.pdf')
+
+
+# ==============================================================================
+# Figure 13: Verification Benchmarks
+# ==============================================================================
+
+def plot_fig13_verification_benchmarks():
+    """ATSS accumulated knowledge vs fresh restart on verification benchmarks."""
+    df = _read_csv('exp_verification_benchmarks.csv')
+    if df is None:
+        return
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), constrained_layout=True)
+
+    benchmarks = df['benchmark'].unique()
+    # Separate ATSS and noATSS data
+    atss_df = df[df['solver'] == 'ATSS (accumulated)'].set_index('benchmark')
+    noatss_df = df[df['solver'] == 'noATSS (fresh)'].set_index('benchmark')
+
+    # Get common benchmarks
+    common = sorted(set(atss_df.index) & set(noatss_df.index))
+
+    x = np.arange(len(common))
+    width = 0.35
+
+    # Panel (a): Proof size comparison
+    ax = axes[0]
+    atss_sizes = [atss_df.loc[b, 'proof_size'].values[0] if isinstance(atss_df.loc[b], pd.DataFrame)
+                  else atss_df.loc[b, 'proof_size'] for b in common]
+    noatss_sizes = [noatss_df.loc[b, 'proof_size'].values[0] if isinstance(noatss_df.loc[b], pd.DataFrame)
+                    else noatss_df.loc[b, 'proof_size'] for b in common]
+    ax.bar(x - width/2, atss_sizes, width, color=COLORS['ATSS'], alpha=0.85,
+           label='ATSS (accumulated)', edgecolor='black', linewidth=0.3)
+    ax.bar(x + width/2, noatss_sizes, width, color=COLORS['noATSS'], alpha=0.85,
+           label='noATSS (fresh)', edgecolor='black', linewidth=0.3)
+    ax.set_xticks(x)
+    ax.set_xticklabels(common, rotation=35, ha='right', fontsize=6)
+    ax.set_ylabel('Proof Size')
+    ax.set_title('(a) Proof Size Comparison')
+    ax.legend(fontsize=7)
+
+    # Panel (b): Time comparison
+    ax2 = axes[1]
+    atss_times = [atss_df.loc[b, 'time_ms'].values[0] if isinstance(atss_df.loc[b], pd.DataFrame)
+                  else atss_df.loc[b, 'time_ms'] for b in common]
+    noatss_times = [noatss_df.loc[b, 'time_ms'].values[0] if isinstance(noatss_df.loc[b], pd.DataFrame)
+                    else noatss_df.loc[b, 'time_ms'] for b in common]
+    ax2.bar(x - width/2, atss_times, width, color=COLORS['ATSS'], alpha=0.85,
+            label='ATSS (accumulated)', edgecolor='black', linewidth=0.3)
+    ax2.bar(x + width/2, noatss_times, width, color=COLORS['noATSS'], alpha=0.85,
+            label='noATSS (fresh)', edgecolor='black', linewidth=0.3)
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(common, rotation=35, ha='right', fontsize=6)
+    ax2.set_ylabel('Time (ms)')
+    ax2.set_title('(b) Solve Time Comparison')
+    ax2.legend(fontsize=7)
+
+    # Panel (c): Speedup ratio
+    ax3 = axes[2]
+    speedups = []
+    for b in common:
+        atss_t = atss_df.loc[b, 'time_ms'] if not isinstance(atss_df.loc[b], pd.DataFrame) else atss_df.loc[b, 'time_ms'].values[0]
+        noatss_t = noatss_df.loc[b, 'time_ms'] if not isinstance(noatss_df.loc[b], pd.DataFrame) else noatss_df.loc[b, 'time_ms'].values[0]
+        speedups.append(noatss_t / max(atss_t, 1e-6))
+    bars = ax3.bar(x, speedups, color=['#1f77b4' if s > 1.0 else '#d62728' for s in speedups],
+                   alpha=0.85, edgecolor='black', linewidth=0.3)
+    ax3.axhline(1.0, color='gray', linestyle='--', linewidth=1, alpha=0.7,
+                label='No speedup (1.0)')
+    ax3.set_xticks(x)
+    ax3.set_xticklabels(common, rotation=35, ha='right', fontsize=6)
+    ax3.set_ylabel('Speedup Ratio (noATSS/ATSS)')
+    ax3.set_title('(c) ATSS Speedup')
+    ax3.legend(fontsize=7)
+    ax3.set_ylim(0, max(speedups) * 1.3)
+
+    _save(fig, 'fig13_verification_benchmarks.pdf')
+
+
+# ==============================================================================
+# Figure 14: Complex Learning
+# ==============================================================================
+
+def plot_fig14_complex_learning():
+    """ATSS vs noATSS learning on complex formulas across epochs."""
+    df = _read_csv('exp_complex_learning.csv')
+    if df is None:
+        return
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), constrained_layout=True)
+
+    # Prepare data
+    atss_data = df[df['mode'] == 'ATSS'].sort_values('epoch')
+    noatss_data = df[df['mode'] == 'noATSS'].sort_values('epoch')
+
+    # Panel (a): Solve time comparison with proof size growth
+    ax = axes[0]
+    ax.plot(atss_data['epoch'], atss_data['time_ms'], 'o-',
+            color=COLORS['with_ATSS'], linewidth=2, markersize=6,
+            label='ATSS (time)')
+    ax.plot(noatss_data['epoch'], noatss_data['time_ms'], 's--',
+            color=COLORS['without_ATSS'], linewidth=2, markersize=6,
+            label='noATSS (time)')
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Time (ms)')
+    ax.set_title('(a) Solve Time vs Epoch')
+    ax.legend(fontsize=9)
+    ax.grid(alpha=0.3)
+
+    # Panel (b): Proof size growth
+    ax2 = axes[1]
+    ax2.plot(atss_data['epoch'], atss_data['proof_size'], 'o-',
+             color=COLORS['with_ATSS'], linewidth=2, markersize=6,
+             label='ATSS (proof size)')
+    ax2.plot(noatss_data['epoch'], noatss_data['proof_size'], 's--',
+             color=COLORS['without_ATSS'], linewidth=2, markersize=6,
+             label='noATSS (proof size)')
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Proof Size')
+    ax2.set_title('(b) Proof Size Growth')
+    ax2.legend(fontsize=9)
+    ax2.grid(alpha=0.3)
+
+    # Panel (c): Solved vs Total
+    ax3 = axes[2]
+    epochs = atss_data['epoch'].values
+    x = np.arange(len(epochs))
+    width = 0.35
+    ax3.bar(x - width/2, atss_data['n_proved'], width, color=COLORS['with_ATSS'],
+            alpha=0.85, label='ATSS', edgecolor='black', linewidth=0.3)
+    ax3.bar(x + width/2, noatss_data['n_proved'], width, color=COLORS['without_ATSS'],
+            alpha=0.85, label='noATSS', edgecolor='black', linewidth=0.3)
+    ax3.axhline(atss_data['n_total'].values[0], color='gray', linestyle='--',
+                alpha=0.7, label=f'Total ({int(atss_data["n_total"].values[0])})')
+    ax3.set_xticks(x)
+    ax3.set_xticklabels([f'E{e}' for e in epochs])
+    ax3.set_ylabel('Problems Solved')
+    ax3.set_title('(c) Solved per Epoch')
+    ax3.legend(fontsize=9)
+    ax3.set_ylim(0, atss_data['n_total'].max() * 1.2)
+
+    _save(fig, 'fig14_complex_learning.pdf')
+
+
+# ==============================================================================
+# Figure 15: First-Order Extension
+# ==============================================================================
+
+def plot_fig15_firstorder_extension():
+    """First-order reasoning benchmarks across domains."""
+    df = _read_csv('exp12_firstorder_extension.csv')
+    if df is None:
+        return
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
+
+    # Sort by time for consistent ordering
+    df_sorted = df.sort_values('time_s')
+
+    # Panel (a): Time per problem grouped by domain
+    ax = axes[0]
+    domains = df['domain'].unique()
+    colors_domain = {
+        'Graph Theory': '#1f77b4',
+        'Set Theory': '#ff7f0e',
+        'Algebra': '#2ca02c',
+        'Model Theory': '#d62728',
+    }
+    x = np.arange(len(df_sorted))
+    bars = ax.bar(x, df_sorted['time_s'] * 1000,
+                  color=[colors_domain.get(d, 'gray') for d in df_sorted['domain']],
+                  alpha=0.85, edgecolor='black', linewidth=0.5)
+
+    # Add status markers
+    for i, (_, row) in enumerate(df_sorted.iterrows()):
+        marker = r'$\checkmark$' if row['status'] == 'SAT' else '?'
+        ax.text(i, row['time_s'] * 1000 + max(df_sorted['time_s']) * 20,
+                marker, ha='center', fontsize=10)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([p[:25] for p in df_sorted['problem']], rotation=30, ha='right', fontsize=7)
+    ax.set_ylabel('Time (ms)')
+    ax.set_title('(a) FO Reasoning: Time by Domain')
+    legend_elements = [Patch(facecolor=c, label=d) for d, c in colors_domain.items()]
+    ax.legend(handles=legend_elements, fontsize=8, loc='upper left')
+    ax.set_yscale('log')
+    ax.grid(alpha=0.3, axis='y')
+
+    # Panel (b): Skolem steps vs time
+    ax2 = axes[1]
+    for domain in domains:
+        sub = df_sorted[df_sorted['domain'] == domain]
+        ax2.scatter(sub['skolem_steps'], sub['time_s'] * 1000,
+                    color=colors_domain.get(domain, 'gray'),
+                    label=domain, s=100, edgecolors='black', linewidth=0.5,
+                    zorder=3)
+        # Annotate problems
+        for _, row in sub.iterrows():
+            ax2.annotate(row['problem'][:15],
+                         (row['skolem_steps'], row['time_s'] * 1000),
+                         textcoords="offset points", xytext=(8, 5),
+                         fontsize=6, alpha=0.8)
+
+    ax2.set_xlabel('Skolemization Steps')
+    ax2.set_ylabel('Time (ms)')
+    ax2.set_title('(b) Skolem Steps vs Solve Time')
+    ax2.legend(fontsize=8)
+    ax2.set_yscale('log')
+    ax2.grid(alpha=0.3)
+
+    _save(fig, 'fig15_firstorder_extension.pdf')
 
 
 # ==============================================================================
@@ -890,6 +1094,8 @@ if __name__ == '__main__':
         'exp10_virtuous_cycle.csv',
         'exp11_frege_extension.csv',
         'exp12_firstorder_extension.csv',
+        'exp_verification_benchmarks.csv',
+        'exp_complex_learning.csv',
     ]
     missing = [f for f in expected_files
                if not os.path.exists(os.path.join(RESULTS_DIR, f))]
@@ -937,6 +1143,15 @@ if __name__ == '__main__':
 
     print("[Figure 12: Operation Costs]")
     plot_fig12_operation_costs()
+
+    print("[Figure 13: Verification Benchmarks]")
+    plot_fig13_verification_benchmarks()
+
+    print("[Figure 14: Complex Learning]")
+    plot_fig14_complex_learning()
+
+    print("[Figure 15: First-Order Extension]")
+    plot_fig15_firstorder_extension()
 
     print()
     print("=" * 60)

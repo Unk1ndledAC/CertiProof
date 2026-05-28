@@ -1,31 +1,31 @@
 formula,solver,size,depth,time_us,time_std_us,status,solve_rate
-p -> p,ATSS,4,3,34,56,PROVED,1.0
-p -> p,noATSS,4,3,17,24,PROVED,1.0
-(p & q) -> p,ATSS,5,4,21,25,PROVED,1.0
-(p & q) -> p,noATSS,5,4,30,27,PROVED,1.0
-p -> (p | q),ATSS,5,4,41,63,PROVED,1.0
-p -> (p | q),noATSS,5,4,27,32,PROVED,1.0
-(p -> q) -> (q -> r) -> (p -> r),ATSS,10,7,48,68,PROVED,1.0
-(p -> q) -> (q -> r) -> (p -> r),noATSS,10,7,44,58,PROVED,1.0
-p -> (q -> p),ATSS,5,4,21,26,PROVED,1.0
-p -> (q -> p),noATSS,5,4,20,25,PROVED,1.0
-p | ~p,ATSS,4,3,2788,6216,PROVED,1.0
-p | ~p,noATSS,4,3,117,243,PROVED,1.0
-~(p & ~p),ATSS,5,4,67,131,PROVED,1.0
-~(p & ~p),noATSS,5,4,64,124,PROVED,1.0
-(p -> q) -> (~q -> ~p),ATSS,7,6,98,187,PROVED,1.0
-(p -> q) -> (~q -> ~p),noATSS,7,6,94,180,PROVED,1.0
-(~p -> ~q) -> (q -> p),ATSS,6,5,138,271,PROVED,1.0
-(~p -> ~q) -> (q -> p),noATSS,6,5,110,214,PROVED,1.0
-((p | q) & ~p) -> q,ATSS,5,4,97,186,PROVED,1.0
-((p | q) & ~p) -> q,noATSS,5,4,102,200,PROVED,1.0
-(p -> q) -> ((p -> ~q) -> ~p),ATSS,11,7,43,57,PROVED,1.0
-(p -> q) -> ((p -> ~q) -> ~p),noATSS,11,7,39,51,PROVED,1.0
-q -> (p | q),ATSS,5,4,48,84,PROVED,1.0
-q -> (p | q),noATSS,5,4,44,77,PROVED,1.0
-(p & q) -> q,ATSS,5,4,19,21,PROVED,1.0
-(p & q) -> q,noATSS,5,4,18,19,PROVED,1.0
-(p <-> q) -> (q <-> p),ATSS,9,6,210,438,PROVED,1.0
-(p <-> q) -> (q <-> p),noATSS,9,6,183,379,PROVED,1.0
-((p -> q) & (q -> r)) -> (p -> r),ATSS,6,5,126,241,PROVED,1.0
-((p -> q) & (q -> r)) -> (p -> r),noATSS,6,5,118,225,PROVED,1.0
+p -> p,ATSS,4,3,41,62,PROVED,1.0
+p -> p,noATSS,4,3,26,34,PROVED,1.0
+(p & q) -> p,ATSS,5,4,33,36,PROVED,1.0
+(p & q) -> p,noATSS,5,4,29,32,PROVED,1.0
+p -> (p | q),ATSS,5,4,34,44,PROVED,1.0
+p -> (p | q),noATSS,5,4,32,39,PROVED,1.0
+(p -> q) -> (q -> r) -> (p -> r),ATSS,10,7,71,98,PROVED,1.0
+(p -> q) -> (q -> r) -> (p -> r),noATSS,10,7,66,88,PROVED,1.0
+p -> (q -> p),ATSS,5,4,31,38,PROVED,1.0
+p -> (q -> p),noATSS,5,4,31,38,PROVED,1.0
+p | ~p,ATSS,4,3,383,829,PROVED,1.0
+p | ~p,noATSS,4,3,120,244,PROVED,1.0
+~(p & ~p),ATSS,5,4,98,192,PROVED,1.0
+~(p & ~p),noATSS,5,4,92,179,PROVED,1.0
+(p -> q) -> (~q -> ~p),ATSS,7,6,143,274,PROVED,1.0
+(p -> q) -> (~q -> ~p),noATSS,7,6,134,256,PROVED,1.0
+(~p -> ~q) -> (q -> p),ATSS,6,5,148,284,PROVED,1.0
+(~p -> ~q) -> (q -> p),noATSS,6,5,143,277,PROVED,1.0
+((p | q) & ~p) -> q,ATSS,5,4,137,263,PROVED,1.0
+((p | q) & ~p) -> q,noATSS,5,4,132,253,PROVED,1.0
+(p -> q) -> ((p -> ~q) -> ~p),ATSS,11,7,60,79,PROVED,1.0
+(p -> q) -> ((p -> ~q) -> ~p),noATSS,11,7,59,76,PROVED,1.0
+q -> (p | q),ATSS,5,4,68,120,PROVED,1.0
+q -> (p | q),noATSS,5,4,63,110,PROVED,1.0
+(p & q) -> q,ATSS,5,4,28,31,PROVED,1.0
+(p & q) -> q,noATSS,5,4,30,27,PROVED,1.0
+(p <-> q) -> (q <-> p),ATSS,9,6,262,545,PROVED,1.0
+(p <-> q) -> (q <-> p),noATSS,9,6,245,506,PROVED,1.0
+((p -> q) & (q -> r)) -> (p -> r),ATSS,6,5,179,339,PROVED,1.0
+((p -> q) & (q -> r)) -> (p -> r),noATSS,6,5,176,333,PROVED,1.0
