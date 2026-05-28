@@ -1,9 +1,8 @@
 \documentclass[conference]{IEEEtran}
 % ============================================================
-% NeuroProof: A Hybrid Propositional Proof System with
+% CertiProof: A Hybrid Propositional Proof System with
 % Adaptive Tactic Synthesis and Certified Proof Checking
 %
-% Submitted to LICS 2027 / CAV 2027
 % ============================================================
 
 % --- Core packages ---
@@ -55,7 +54,7 @@
 \newcommand{\dltop}{\top}
 \newcommand{\Fml}{\mathcal{F}}
 \newcommand{\Var}{\mathsf{Var}}
-\newcommand{\NP}{\textsc{NeuroProof}}
+\newcommand{\CP}{\textsc{CertiProof}}
 \newcommand{\ATSS}{\textsc{ATSS}}
 \newcommand{\PHP}{\textnormal{PHP}}
 \newcommand{\CNF}{\textnormal{CNF}}
@@ -88,7 +87,7 @@
 % ============================================================
 \begin{document}
 
-\title{NeuroProof: A Hybrid Propositional Proof System with\\
+\title{CertiProof: A Hybrid Propositional Proof System with\\
   Adaptive Tactic Synthesis and Certified Proof Checking}
 
 %\author{
@@ -110,7 +109,7 @@
 
 % ============================================================
 \begin{abstract}
-We present \NP{}, a hybrid propositional proof system that
+We present \CP{}, a hybrid propositional proof system that
 combines automated SAT solving with interactive theorem proving
 through four novel contributions.
 \textbf{(C1)}~A CDCL solver with \emph{two-watched-literal} Boolean
@@ -130,7 +129,7 @@ semantically meaningful subgoals.
 
 The entire proof calculus is \emph{sound} for classical propositional
 logic, with the soundness theorem mechanically verified in Rocq~9.0,
-and p-simulates Frege (hence complete). Experimentally, \NP{} proves
+and p-simulates Frege (hence complete). Experimentally, \CP{} proves
 all 15~classical tautologies in 2--10~steps, demonstrates correct
 proof certification across the full easy--hard--easy spectrum of
 random 3-CNF, and correctly reports the exponential
@@ -158,9 +157,9 @@ solvers produce \emph{opaque} certificates that resist human inspection,
 while interactive provers yield \emph{readable} proofs but demand
 substantial expert guidance.
 
-\NP{} bridges this gap with three novel, tightly coupled design choices
+\CP{} bridges this gap with three novel, tightly coupled design choices
 that we argue are \emph{individually necessary and jointly sufficient}
-for practical certified proving.  \textbf{We emphasise that \NP{} is
+for practical certified proving.  \textbf{We emphasise that \CP{} is
 designed as a \emph{certified proof system}, not a SAT solver.}  Its
 primary objectives are (i)~producing proofs that are independently
 verifiable under the de~Bruijn criterion and (ii)~enabling automated
@@ -207,7 +206,7 @@ via Azuma-Hoeffding concentration---this is, to our knowledge, the
 first application of adversarial bandit theory to proof search.
 
 \paragraph{Novel inference rules.}
-Beyond the hybrid calculus, \NP{} introduces two novel rules that
+Beyond the hybrid calculus, \CP{} introduces two novel rules that
 distinguish it from prior work.  \textsc{Lemma\_Learn} promotes
 CDCL-learned conflict clauses to natural-deduction lemmas, bridging
 the gap between CNF-level clause learning and ND-level proof
@@ -228,7 +227,7 @@ Our four main contributions are:
   \item \emph{EXP3-ATSS}, an adversarial-bandit framework for
     adaptive tactic selection with provable regret bounds under
     non-i.i.d.\ formula streams (\Cref{thm:atss-regret}).
-  \item A \emph{p-simulation} argument showing \NP{} simulates Frege
+  \item A \emph{p-simulation} argument showing \CP{} simulates Frege
     (\Cref{thm:completeness}), with both soundness and syntactic
     completeness mechanically verified in Rocq.
   \item An \emph{open-source implementation} evaluated across ten
@@ -267,7 +266,7 @@ Our four main contributions are:
     \draw[arrow, bend right=25] (tcb.north) to
       node[right,font=\tiny,pos=0.6]{OK} (core.east);
   \end{tikzpicture}
-  \caption{Architecture of \NP{}.  \ATSS{} selects tactics for the
+  \caption{Architecture of \CP{}.  \ATSS{} selects tactics for the
     hybrid calculus; conflict clauses feed Craig interpolation, which
     populates the ATSS lemma table.  Proof steps are verified through
     the dual Python/Rocq chain.}
@@ -276,7 +275,7 @@ Our four main contributions are:
 
 \paragraph{Paper organisation.}
 \Cref{sec:background} reviews background.
-\Cref{sec:system} defines the \NP{} proof calculus.
+\Cref{sec:system} defines the \CP{} proof calculus.
 \Cref{sec:atss} presents \ATSS{} and its convergence analysis.
 \Cref{sec:interpolation} develops the interpolant extraction.
 \Cref{sec:rocq} describes the Rocq formalisation.
@@ -338,7 +337,7 @@ Heule, Kaufmann, and Hunt~\cite{HeuleKaufmann2023} introduced
 proof trimming to reduce redundant steps.
 Recent work has produced \emph{fully verified} SAT solver
 frameworks~\cite{FleuryVerifiedSAT2025}, certifying the solver
-itself rather than just its output.  \NP{} extends this philosophy
+itself rather than just its output.  \CP{} extends this philosophy
 by verifying not just the solver's proof log, but the \emph{entire
 proof calculus} including novel rules.
 
@@ -371,15 +370,15 @@ offline via a ``wake-sleep'' program-induction paradigm.
 While DreamProver shares our goal of lemma reuse, the approaches
 are fundamentally different along three dimensions:
 \begin{enumerate}
-  \item \textbf{Online vs.\ offline.}  \NP{}'s \textsc{Lemma\_Reuse}
+  \item \textbf{Online vs.\ offline.}  \CP{}'s \textsc{Lemma\_Reuse}
     operates \emph{during online proof construction} as a DAG edge in
     the proof graph---it requires no offline training phase.  DreamProver
     evolves its library across sessions through expensive wake-sleep
     cycles.
-  \item \textbf{Symbolic vs.\ neural.}  \NP{} uses purely symbolic
+  \item \textbf{Symbolic vs.\ neural.}  \CP{} uses purely symbolic
     Craig interpolants as lemma candidates, requiring no neural network.
     DreamProver relies on program synthesis guided by a language model.
-  \item \textbf{Feedback loop.}  \NP{}'s lemma table is populated
+  \item \textbf{Feedback loop.}  \CP{}'s lemma table is populated
     \emph{incrementally} from Craig interpolants extracted during each
     proof attempt, creating a feedback loop (interpolants $\to$ ATSS
     $\to$ better cuts $\to$ richer interpolants) that improves
@@ -388,13 +387,13 @@ are fundamentally different along three dimensions:
 \end{enumerate}
 
 \noindent
-\NP{} is further distinguished by its \emph{online} learning paradigm:
+\CP{} is further distinguished by its \emph{online} learning paradigm:
 \ATSS{} requires zero training data and improves monotonically during
 a single proof-search session, making it applicable to \emph{arbitrary}
 novel formula families from the first interaction.  Recent verified
 SAT solver efforts~\cite{LammichLRAT2024,FleuryVerifiedSAT2025}
 have focused on certifying solver outputs post-hoc via LRAT proof
-logs; \NP{} instead verifies the \emph{entire proof calculus}
+logs; \CP{} instead verifies the \emph{entire proof calculus}
 including novel rules, following the de~Bruijn
 criterion~\cite{Harrison2009}.  Nordstr\"{o}m~\cite{NordstromProofComplexity2025}
 provides a contemporary survey connecting proof complexity to modern
@@ -422,7 +421,7 @@ channel, creating a feedback mechanism specifically designed for
 proof construction rather than generic action selection.
 
 % ============================================================
-\section{The NeuroProof Proof Calculus}
+\section{The CertiProof Proof Calculus}
 \label{sec:system}
 
 \subsection{Syntax}
@@ -447,7 +446,7 @@ if $v \entails \varphi$ for all $v$.
 
 \subsection{Natural Deduction Rules}
 
-\NP{} uses the Prawitz--Gentzen natural deduction
+\CP{} uses the Prawitz--Gentzen natural deduction
 calculus~\cite{Prawitz1965,Gentzen1969} with all standard rules:
 
 \medskip
@@ -497,7 +496,7 @@ calculus~\cite{Prawitz1965,Gentzen1969} with all standard rules:
 
 \subsection{Sequent Calculus Bridge}
 
-To connect with the resolution calculus, \NP{} provides sequent
+To connect with the resolution calculus, \CP{} provides sequent
 calculus rules as a \emph{bridge layer}.  A sequent
 $\Gamma \proves \Delta$ is encoded semantically as:
 \begin{equation}
@@ -523,7 +522,7 @@ The key bridge rules are:
 
 \begin{theorem}[Soundness]
   \label{thm:soundness}
-  If $\Gamma \proves \varphi$ is derivable in \NP{}, then
+  If $\Gamma \proves \varphi$ is derivable in \CP{}, then
   $\Gamma \entails \varphi$.
 \end{theorem}
 \begin{proof}[Proof sketch]
@@ -547,19 +546,19 @@ The key bridge rules are:
 
 \begin{theorem}[Completeness]
   \label{thm:completeness}
-  \NP{} p-simulates Frege, and hence is complete for classical
+  \CP{} p-simulates Frege, and hence is complete for classical
   propositional logic: every tautology has a polynomial-size
-  \NP{}-proof.
+  \CP{}-proof.
 \end{theorem}
 \begin{proof}[Proof sketch]
   We establish p-simulation via a three-step polynomial-time
   translation: (1)~\textbf{Frege to ND}: each Frege rule has a bounded-
-  length \NP{} simulation---modus ponens is exactly \textsc{MP};
+  length \CP{} simulation---modus ponens is exactly \textsc{MP};
   uniform variable replacement is handled by induction on formula size;
   axiom scheme instances are constant-depth tautologies.  (2)~\textbf{ND
   to sequent calculus}: the standard embedding translates each ND rule
-  with at most linear blow-up, and \NP{} provides \textsc{SC-Cut} for the
-  sequent calculus cut rule.  (3)~\textbf{Sequent calculus to \NP{}}
+  with at most linear blow-up, and \CP{} provides \textsc{SC-Cut} for the
+  sequent calculus cut rule.  (3)~\textbf{Sequent calculus to \CP{}}
   via \textsc{SC-AX} and \textsc{SC-Cut}.  The composition of three
   polynomial-time translations is polynomial-time, establishing
   p-simulation.
@@ -571,7 +570,7 @@ The key bridge rules are:
 While the p-simulation argument above establishes completeness
 \emph{relative} to Frege, a more fundamental question remains: can
 \emph{every} tautology be proved directly in the natural deduction
-fragment of \NP{}?  We answer this affirmatively via
+fragment of \CP{}?  We answer this affirmatively via
 \emph{Kalm\'{a}r's constructive completeness theorem}~\cite{Kalmar1935},
 which provides an explicit algorithm for building an ND proof of
 any tautology from the standard rules alone---without recourse to
@@ -645,8 +644,8 @@ the CDCL solver or the novel rules.
   (Full proof in Appendix~\ref{app:proofs}.)
 \end{proof}
 
-\begin{corollary}[Kalmar-Completeness for \NP{}]
-  Every tautology has an \NP{}-proof using only the ND fragment, of
+\begin{corollary}[Kalmar-Completeness for \CP{}]
+  Every tautology has an \CP{}-proof using only the ND fragment, of
   size $O(2^n \cdot |\varphi|)$ where $n$ is the number of variables.
   With \textsc{Lemma\_Reuse} and \textsc{Adaptive\_Cut}, the
   effective proof size is reduced to $O(|\varphi| \cdot \log n)$ for
@@ -663,27 +662,27 @@ rules.  This establishes that the ND fragment alone is
 rules serve as \emph{proof accelerators}, reducing proof size from
 $O(2^n)$ to polynomial for structured families while preserving
 soundness.  This separation of \emph{completeness} (ND fragment)
-from \emph{efficiency} (full \NP{}) is a conceptual contribution
-that clarifies \NP{}'s architecture.
+from \emph{efficiency} (full \CP{}) is a conceptual contribution
+that clarifies \CP{}'s architecture.
 
 \begin{remark}[Comparison with p-simulation]
   The p-simulation argument (\Cref{thm:completeness}) establishes
-  \NP{}-completeness relative to Frege, guaranteeing polynomial-size
+  \CP{}-completeness relative to Frege, guaranteeing polynomial-size
   proofs for all tautologies.  Kalm\'{a}r's argument
   (\Cref{thm:constructive-completeness}) establishes completeness
   \emph{internal} to the ND calculus, showing that no external
   reasoning power is needed.  Together, they provide a two-tier
   completeness guarantee: the system is both \emph{absolute-complete}
-  (ND fragment) and \emph{efficient-complete} (full \NP{}).
+  (ND fragment) and \emph{efficient-complete} (full \CP{}).
 \end{remark}
 
 \subsection{The Virtuous Cycle: CDCL $\to$ Interpolation $\to$ ATSS $\to$ Cut}
 \label{sec:virtuous-cycle}
 
-A defining architectural contribution of \NP{} is the \emph{virtuous
+A defining architectural contribution of \CP{} is the \emph{virtuous
 cycle} that integrates its four core components into a self-reinforcing
 proof-search loop.  Unlike prior systems that treat search, learning,
-and verification as separate stages, \NP{} organises them as a
+and verification as separate stages, \CP{} organises them as a
 continuous feedback loop where each component's output enriches the
 input of the next.  We now analyse this cycle quantitatively.
 
@@ -735,7 +734,7 @@ input of the next.  We now analyse this cycle quantitatively.
     \draw[darrow, bend left=35] (atss.west) to
       node[annot,left,pos=0.5]{Weight update} (atss.north west);
   \end{tikzpicture}
-  \caption{The \NP{} Virtuous Cycle.  \textbf{Stage~1:} CDCL conflict
+  \caption{The \CP{} Virtuous Cycle.  \textbf{Stage~1:} CDCL conflict
     analysis produces $N_c$ learned clauses per refutation.
     \textbf{Stage~2:} Incremental Craig interpolation extracts $|\mathcal{I}|$
     interpolants, populating the global lemma table.
@@ -844,7 +843,7 @@ experimental findings:
     decomposition attempts.  This explains the nearly identical
     proof sizes between ATSS and noATSS on this benchmark.
   \item \textbf{Experiment~5} (Ablation):
-    the $7.5\times$ speedup of \NP{}+\ATSS{} over DPLL-Baseline
+    the $7.5\times$ speedup of \CP{}+\ATSS{} over DPLL-Baseline
     on Easy instances arises from the cycle's first iteration:
     CDCL-learned clauses are promoted to ND lemmas via
     \textsc{Lemma\_Learn}, which ATSS prefers over
@@ -870,7 +869,7 @@ experimental findings:
 
 \subsection{Novel Rules}
 
-\NP{} introduces three rules not found in any existing proof system:
+\CP{} introduces three rules not found in any existing proof system:
 
 \begin{definition}[ADAPTIVE\_CUT]
   \label{def:adaptive-cut}
@@ -936,7 +935,7 @@ formalisation (Theorem \texttt{adaptive\_cut\_sound}).
 
 \begin{table}[t]
   \centering\footnotesize
-  \caption{Summary of \NP{} novel rules.  All rules are
+  \caption{Summary of \CP{} novel rules.  All rules are
     soundness-verified in Rocq; rules marked $\dagger$ rely on
     \ATSS{} for formula selection.}
   \label{tab:novel-rules}
@@ -1061,7 +1060,7 @@ this in three ways:
 \ATSS{} operates over $K=11$ tactics: five structural introduction
 tactics ($\land_I$, $\to_I$, $\neg_I$, $\lor_I$, $\leftrightarrow_I$),
 three elimination tactics (assumption, modus ponens, contradiction),
-the CDCL solver fallback, and the two novel NeuroProof tactics
+the CDCL solver fallback, and the two novel CertiProof tactics
 (\textsc{Lemma\_Learn} and \textsc{Interpolation\_Guided\_Cut},
 \Cref{sec:novel-rules}).
 
@@ -1084,7 +1083,7 @@ constructive decomposition.
 \label{sec:novel-rules}
 
 In addition to the hybrid calculus combining natural deduction,
-sequent calculus, and resolution, \NP{} introduces two rules that
+sequent calculus, and resolution, \CP{} introduces two rules that
 are genuinely novel contributions to the proof-theoretic literature.
 
 \subsection{Lemma\_Learn: From CNF to ND}
@@ -1157,7 +1156,7 @@ decomposition introduces no extraneous vocabulary.
 \subsection{Incremental Interpolation during CDCL Search}
 \label{sec:incremental-interpolation}
 
-A key innovation of \NP{} is \emph{incremental} Craig interpolation:
+A key innovation of \CP{} is \emph{incremental} Craig interpolation:
 rather than computing the interpolant post-hoc from the complete
 resolution proof (Pudl\'{a}k's method), we maintain \emph{partial
 interpolants} for each learned clause during CDCL search.
@@ -1218,7 +1217,7 @@ with the interpolant as a learned lemma, reducing the search space.
   \end{enumerate}
 \end{theorem}
 
-\NP{} implements Pudl\'{a}k's resolution-based algorithm in
+\CP{} implements Pudl\'{a}k's resolution-based algorithm in
 the interpolant extraction module of the CDCL solver.  For a resolution
 refutation of $A \wedge B$, each clause~$C$ is annotated.
 Let $\mathcal{V}_{AB} = \Var(A) \cap \Var(B)$ denote the shared variables:
@@ -1274,7 +1273,7 @@ Resolution on pivot variable $x$ propagates the interpolant:
 
 \begin{corollary}
   For any tautology family where the most frequently duplicated
-  sub-derivation appears $\Omega(\log s)$ times, \NP{} with
+  sub-derivation appears $\Omega(\log s)$ times, \CP{} with
   \textsc{Lemma\_Reuse} produces proofs \emph{strictly smaller} than
   any tree-like proof system.
 \end{corollary}
@@ -1283,14 +1282,14 @@ Resolution on pivot variable $x$ propagates the interpolant:
 \section{Rocq/Coq Formalisation}
 \label{sec:rocq}
 
-The \NP{} kernel is formalised in Rocq~9.0 (1171~lines, compiled
+The \CP{} kernel is formalised in Rocq~9.0 (1171~lines, compiled
 with \texttt{coqc}~9.0).  The formalisation provides two complementary
 completeness arguments:
 
 \begin{itemize}
   \item \textbf{p-Simulation} (\Cref{thm:completeness}): proved on
     paper via a three-step translation (Frege $\to$ ND $\to$ sequent
-    calculus $\to$ \NP{}).  This argument guarantees
+    calculus $\to$ \CP{}).  This argument guarantees
     \emph{polynomial-size} proofs for every tautology but has not
     yet been fully mechanised in Rocq due to the technical complexity
     of formalising substitution-based simulation arguments.
@@ -1354,13 +1353,13 @@ Proof. intros v p q Hpq Hp. exact (Hpq Hp). Qed.
 \label{sec:experiments}
 
 \textbf{Goal of this evaluation.}  The experiments below are designed
-to answer three questions: (1)~Does \NP{} produce correct,
+to answer three questions: (1)~Does \CP{} produce correct,
 human-readable proofs? (2)~Does ATSS learn meaningful tactic
 preferences online? (3)~Does the hybrid calculus handle diverse
 formula types (tautologies, resolution-hard instances, phase
 transition)?  We do \emph{not} aim to outperform industrial SAT
 solvers on raw solve time; as a Python research prototype with a
-formally verified TCB, \NP{} prioritises \emph{certified correctness}
+formally verified TCB, \CP{} prioritises \emph{certified correctness}
 over benchmark speed.  Where we compare with Glucose4, the comparison
 serves to demonstrate qualitative differences in certification and
 proof output, not to claim performance parity with a 20+year
@@ -1368,12 +1367,12 @@ C/C++-optimised SAT solver.
 
 \subsection{Setup}
 
-We evaluate \NP{} on ten benchmarks using three solver configurations
+We evaluate \CP{} on ten benchmarks using three solver configurations
 on a standard workstation (Intel~i7-13700K, 32\,GB RAM, NVIDIA
 RTX~4060; Python~3.12, 64-bit Linux).  The
 configurations compared are:
 \begin{itemize}
-  \item \textbf{\NP{}+\ATSS{}}: full system with CDCL solver,
+  \item \textbf{\CP{}+\ATSS{}}: full system with CDCL solver,
     online tactic learning, and Craig interpolant extraction.
   \item \textbf{DPLL-Baseline}: vanilla DPLL with unit propagation
     but no clause learning or backjumping.
@@ -1428,7 +1427,7 @@ $n_{S,B}(o)$ are derived from algorithmic analysis of the solver
 architecture (e.g., conflict-analysis cycles for CDCL, branching
 decisions for DPLL).  This approach decouples algorithmic efficiency
 from implementation efficiency, making it possible to estimate
-\NP{}'s performance in a hypothetical optimised C/C++ port.
+\CP{}'s performance in a hypothetical optimised C/C++ port.
 
 \begin{figure}[t]
   \centering
@@ -1436,7 +1435,7 @@ from implementation efficiency, making it possible to estimate
   \caption{Operation-primitive cost comparison: Python vs.\ estimated
     C/C++ across 10 core operations. The ${\sim}200\times$ gap reflects
     Python's dict-based data structures vs.\ C arrays. Interpolant and
-    conflict-analysis operations dominate \NP{}'s runtime.}
+    conflict-analysis operations dominate \CP{}'s runtime.}
   \label{fig:op-costs}
 \end{figure}
 
@@ -1444,7 +1443,7 @@ from implementation efficiency, making it possible to estimate
 
 \begin{table}[t]
   \centering\footnotesize\setlength{\tabcolsep}{3pt}
-  \caption{Classical tautology benchmarks (\NP{}+\ATSS{}).
+  \caption{Classical tautology benchmarks (\CP{}+\ATSS{}).
    All 15 formulas proved successfully.
    Proof quality metrics: \texttt{solver\_fallback} tactic
    dominates on simple tautologies (see~\cref{sec:exp-quality}).}
@@ -1492,7 +1491,7 @@ from implementation efficiency, making it possible to estimate
   \includegraphics[width=\linewidth]{figures/fig1_classical_tautologies.pdf}
   \caption{Classical tautology proofs: size and depth distribution
     across 15 formulas. All formulas are proved successfully
-    (\NP{}+\ATSS{}), with proof sizes 2--9 steps and depths 1--5.}
+    (\CP{}+\ATSS{}), with proof sizes 2--9 steps and depths 1--5.}
   \label{fig:tautologies}
 \end{figure}
 
@@ -1521,14 +1520,14 @@ with \ATSS{} enabled.  Key observations:
 \begin{table}[t]
   \centering\footnotesize\setlength{\tabcolsep}{4pt}
   \caption{Pigeonhole Principle $\PHP_n^{n+1}$: solve statistics.
-   \NP{} returns UNKNOWN (conflict limit 500{,}000 reached)
+   \CP{} returns UNKNOWN (conflict limit 500{,}000 reached)
    for $n \geq 4$, as expected from the exponential resolution
    lower bound.  Times are derived from operation-primitive
    analysis (\cref{sec:op-primitives}).}
   \label{tab:pigeonhole}
   \begin{tabular}{@{}r r r r r c@{}}
     \toprule
-    $n$ & \#Vars & \#Clauses & \NP{} Time & DPLL Time & Status \\
+    $n$ & \#Vars & \#Clauses & \CP{} Time & DPLL Time & Status \\
     \midrule
     2 &   6 &   12 & ${<}1$\,s & ${<}0.001$\,s & UNSAT \\
     3 &  12 &   34 & ${\sim}8$\,s  & ${<}0.001$\,s & UNKNOWN \\
@@ -1543,7 +1542,7 @@ with \ATSS{} enabled.  Key observations:
   \centering
   \includegraphics[width=\linewidth]{figures/fig2_pigeonhole.pdf}
   \caption{Pigeonhole principle $\PHP_n^{n+1}$: solve time and
-    conflict count scaling with $n$. \NP{}+\ATSS{} correctly
+    conflict count scaling with $n$. \CP{}+\ATSS{} correctly
     reports UNKNOWN for $n \geq 4$ at the 500{,}K conflict limit.}
   \label{fig:pigeonhole}
 \end{figure}
@@ -1559,14 +1558,14 @@ lenses:
     proofs~\cite{Pitassi1998,Ben-Sasson2001}: the shortest
     resolution refutation of $\PHP_n^{n+1}$ has size
     $2^{\Omega(n)}$.  For $n=2,3$, the instance is small enough
-    that \NP{}'s CDCL kernel can complete the refutation within the
+    that \CP{}'s CDCL kernel can complete the refutation within the
     500{,}000-conflict limit.  For $n \geq 4$, the required number
-    of resolution steps exceeds this bound, and \NP{} correctly
+    of resolution steps exceeds this bound, and \CP{} correctly
     reports UNKNOWN.  The DPLL baseline, lacking clause learning,
     requires exponentially more branching decisions and reaches the
     timeout at $n \geq 5$.
 
-  \item \textbf{Operation-count analysis.}  At $n=4$, \NP{} performs
+  \item \textbf{Operation-count analysis.}  At $n=4$, \CP{} performs
     ${\sim}500{,}000$ conflict-analysis cycles ($50\,\mu$s each in
     Python) for a total of ${\sim}25$\,s, plus interpolation and ATSS
     overhead.  Glucose4 achieves the same refutation in ${\sim}700$
@@ -1574,17 +1573,17 @@ lenses:
     ${\sim}125{,}000\times$ wall-clock gap but only a
     ${\sim}700\times$ gap in operation count, consistent with the
     ${\sim}200\times$ Python/C++ efficiency factor and the additional
-    interpolation overhead unique to \NP{}.
+    interpolation overhead unique to \CP{}.
 
   \item \textbf{Honest failure is a feature.}
     State-of-the-art SAT solvers (Kissat, CaDiCaL) solve PHP$_6$ in
-    milliseconds~\cite{BiereSATCompetition2024}.  \NP{} is \emph{not}
+    milliseconds~\cite{BiereSATCompetition2024}.  \CP{} is \emph{not}
     designed to compete with these highly optimised systems on raw
     performance.  Its value lies in producing \emph{certified
     human-readable proofs} (\Cref{tab:tautologies}).  We include PHP
-    to demonstrate \NP{}'s honest failure mode: it correctly reports
+    to demonstrate \CP{}'s honest failure mode: it correctly reports
     UNKNOWN rather than returning an incorrect verdict.  The operation
-    counts confirm that \NP{}'s algorithmic core performs comparably
+    counts confirm that \CP{}'s algorithmic core performs comparably
     to industrial solvers once implementation efficiency is factored
     out.
 \end{enumerate}
@@ -1606,7 +1605,7 @@ solver configuration with a 60-second timeout.
   \caption{Phase transition in random 3-CNF ($n=20$, 10 trials
     per ratio).  All solvers exhibit the characteristic threshold
     around $\alpha \approx 4.27$.  Glucose4 dominates on UNSAT
-    instances; \NP{}+\ATSS{} performs comparably on SAT instances.}
+    instances; \CP{}+\ATSS{} performs comparably on SAT instances.}
   \label{fig:phase-transition}
 \end{figure}
 
@@ -1617,7 +1616,7 @@ $\alpha \approx 4.27$~\cite{Dubois2001}.  Below the transition
 above the transition ($\alpha > 5.0$), refutation-based solvers
 also succeed rapidly.  Near the threshold ($\alpha \in [3.8, 4.8]$),
 solve times peak and SAT/UNSAT fractions are most variable.
-Glucose4 consistently outperforms both \NP{}+\ATSS{} and DPLL-Baseline
+Glucose4 consistently outperforms both \CP{}+\ATSS{} and DPLL-Baseline
 in this critical region, which is expected given its sophisticated
 clause-learning and restart heuristics.
 
@@ -1625,7 +1624,7 @@ clause-learning and restart heuristics.
 \label{sec:exp-quality}
 
 To isolate the effect of ATSS on proof quality, we compare the
-\NP{}+\ATSS{} configuration against \NP{} with ATSS disabled
+\CP{}+\ATSS{} configuration against \CP{} with ATSS disabled
 (\textsc{noATSS}) on the 15 classical tautologies
 (\cref{tab:tautologies}).  Both configurations use the same CDCL
 kernel and proof builder; the only difference is whether ATSS guides
@@ -1663,20 +1662,20 @@ The standard ND prover uses the same tactic engine but disables
 \textsc{solver\_fallback}, forcing all reasoning through
 introduction/elimination rules.  On the 15 classical tautologies,
 the standard ND prover produces proofs of size 4--18 steps (median
-7) compared to 2--9 steps (median 3) for \NP{}+\ATSS{}---a
+7) compared to 2--9 steps (median 3) for \CP{}+\ATSS{}---a
 reduction of $\approx$57\% in proof size.  This difference arises
-from \NP{}'s CDCL kernel, which shortcuts many ND-level rule
+from \CP{}'s CDCL kernel, which shortcuts many ND-level rule
 applications through unit propagation and resolution, effectively
 compressing the proof.  The proof-depth reduction is even more
 pronounced: standard ND proofs reach depth 3--10 (median 5), while
-\NP{} proofs stay at depth 1--5 (median 2), reflecting the hybrid
+\CP{} proofs stay at depth 1--5 (median 2), reflecting the hybrid
 calculus's ability to collapse deep propositional reasoning into
 single \textsc{solver\_fallback} steps.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{figures/fig4_proof_quality.pdf}
-  \caption{Proof quality comparison: \NP{}+\ATSS{} vs.\ \NP{}
+  \caption{Proof quality comparison: \CP{}+\ATSS{} vs.\ \CP{}
     without ATSS (noATSS) vs.\ standard ND prover on 15 classical
     tautologies. ATSS provides marginal improvement on deep formulas;
     the hybrid calculus reduces proof size by ${\sim}57\%$ vs.\ pure ND
@@ -1710,7 +1709,7 @@ solved by all three configurations with a 60-second timeout.
       & Conflicts \\
     \midrule
     \multirow{3}{*}{Easy}
-      & \NP{}+\ATSS{}
+      & \CP{}+\ATSS{}
         & 2.0\,ms & 1.00 & 5 \\
       & DPLL-Baseline
         & 15\,ms & 1.00 & 50 \\
@@ -1718,7 +1717,7 @@ solved by all three configurations with a 60-second timeout.
         & 1.0\,ms & 1.00 & 10 \\
     \midrule
     \multirow{3}{*}{Phase}
-      & \NP{}+\ATSS{}
+      & \CP{}+\ATSS{}
         & 75\,s / 45\,s$^{\dagger}$ & 0.50 & 500{,}000 \\
       & DPLL-Baseline
         & 60\,s / 3.5\,s$^{\dagger}$ & 0.40 & 500{,}000 \\
@@ -1726,7 +1725,7 @@ solved by all three configurations with a 60-second timeout.
         & 1.0\,ms & 1.00 & 10 \\
     \midrule
     \multirow{3}{*}{Hard}
-      & \NP{}+\ATSS{}
+      & \CP{}+\ATSS{}
         & 75\,s & 0.00 & 500{,}000 \\
       & DPLL-Baseline
         & 60\,s & 0.00 & 500{,}000 \\
@@ -1744,18 +1743,18 @@ solved by all three configurations with a 60-second timeout.
   \includegraphics[width=\linewidth]{figures/fig5_ablation.pdf}
   \caption{Ablation study across three difficulty levels
     (Easy/Phase/Hard). Glucose4 dominates across all levels;
-    \NP{}+\ATSS{} outperforms DPLL-Baseline by $7.5\times$ on
+    \CP{}+\ATSS{} outperforms DPLL-Baseline by $7.5\times$ on
     Easy instances. Phase and Hard instances reveal the exponential
     resolution lower bound for random 3-CNF.}
   \label{fig:ablation}
 \end{figure}
 
 \Cref{tab:ablation,fig:ablation} confirms the expected hierarchy: Glucose4
-dominates across all difficulty levels, while \NP{}+\ATSS{}
+dominates across all difficulty levels, while \CP{}+\ATSS{}
 outperforms DPLL-Baseline on Easy instances where CDCL clause
 learning provides a measurable advantage (2.0\,ms vs.\ 15\,ms,
 a $7.5\times$ speedup).  On Phase and Hard instances, both
-\NP{}+\ATSS{} and DPLL-Baseline hit the 500{,}000-conflict limit
+\CP{}+\ATSS{} and DPLL-Baseline hit the 500{,}000-conflict limit
 on UNSAT instances, consistent with the exponential resolution
 lower bound for random 3-CNF near the phase
 transition~\cite{Kirkpatrick1994,Dubois2001}.  The SAT/UNSAT split at
@@ -1779,7 +1778,7 @@ generated and solved (60\,s timeout).
   \includegraphics[width=\linewidth]{figures/fig6_scalability.pdf}
   \caption{Scalability of solve time with number of variables
     ($\alpha=4.3$, 10 trials per point, 60\,s timeout).  Shaded
-    regions indicate interquartile range.  \NP{}+\ATSS{} and
+    regions indicate interquartile range.  \CP{}+\ATSS{} and
     DPLL-Baseline exhibit steep growth beyond $n \approx 30$;
     Glucose4 scales more gracefully due to restart policies.}
   \label{fig:scalability}
@@ -1788,7 +1787,7 @@ generated and solved (60\,s timeout).
 As shown in~\cref{fig:scalability}, we estimate via
 operation-primitive analysis that all solvers maintain tractable
 performance for $n \leq 20$, but diverge sharply beyond this
-threshold.  \NP{}+\ATSS{} benefits from CDCL clause learning to
+threshold.  \CP{}+\ATSS{} benefits from CDCL clause learning to
 achieve ${\sim}0.45$\,s at $n=30$ and ${\sim}7.2$\,s at $n=40$,
 while DPLL-Baseline encounters exponential blowup ($5.5$\,s at
 $n=30$, timeout at $n=40$).  This $8.3\times$ gap at $n=40$
@@ -1817,13 +1816,13 @@ remains well below $1$\,ms across the entire range.
     AlphaProof~\cite{AlphaProof2025} & $10^7$ & \checkmark & --- & Lean 4 \\
     DreamProver~\cite{DreamProver2026} & $10^5$ & partial & --- & Lean 4 \\
     \midrule
-    \textbf{\NP{}} & \textbf{0} & \textbf{\checkmark} &
+    \textbf{\CP{}} & \textbf{0} & \textbf{\checkmark} &
       \textbf{\checkmark} & \textbf{ND+SC+Res} \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\NP{} is the \emph{only} system that simultaneously achieves
+\CP{} is the \emph{only} system that simultaneously achieves
 (1)~zero pre-training, (2)~certified proof checking via a
 dual Python/Rocq chain, and (3)~online learning during proof search.
 All neural/neural-symbolic systems require substantial pre-training
@@ -1849,7 +1848,7 @@ family and random 3-CNF instances
       & Time & Ops & Cert. \\
     \midrule
     \multirow{3}{*}{PHP$_4^{5}$}
-      & \NP{}+\ATSS{}
+      & \CP{}+\ATSS{}
         & 5.6\,s$^{\dagger}$ & ${\sim}37$K & \checkmark \\
       & DPLL-Baseline
         & 15.2\,s$^{\ddagger}$ & ${\sim}30$M & --- \\
@@ -1857,7 +1856,7 @@ family and random 3-CNF instances
         & 1.1\,ms & ${\sim}700$ & DRAT \\
     \midrule
     \multirow{3}{*}{3-CNF $\alpha{=}4.0$}
-      & \NP{}+\ATSS{}
+      & \CP{}+\ATSS{}
         & 2.5\,s$^{\mathsection}$ & ${\sim}17$K & \checkmark \\
       & DPLL-Baseline
         & 5.8\,s & ${\sim}12$M & --- \\
@@ -1879,13 +1878,13 @@ family and random 3-CNF instances
 operation counts, enabling comparison at the algorithmic level
 independent of implementation language.  Glucose4's 1.1\,ms on
 PHP$_4^{5}$ corresponds to ${\sim}700$ conflict-analysis cycles;
-\NP{}'s 5.6\,s reflects ${\sim}37{,}000$ cycles at the conflict
+\CP{}'s 5.6\,s reflects ${\sim}37{,}000$ cycles at the conflict
 limit with an additional ${\sim}3.5$\,s of Python overhead
 (${\sim}95\,\mu$s/conflict vs.\ $1.6\,\mu$s/conflict in C++).
 On random 3-CNF, the operation gap narrows ($500$ vs.\ $17{,}000$
 conflicts), reflecting the structural difficulty of random instances
 where CDCL learning provides limited leverage.  Critically,
-\NP{}'s operation counts are \emph{not} a pure efficiency loss:
+\CP{}'s operation counts are \emph{not} a pure efficiency loss:
 each conflict produces a Craig interpolant for the lemma table
 and a certified proof step, operations with no counterpart in
 Glucose4.  The ${\sim}37$K vs.\ 700 conflict gap on PHP
@@ -1893,14 +1892,14 @@ illustrates the exponential resolution lower bound~\cite{BenSasson2002};
 no CDCL solver escapes this complexity, only mitigates it through
 implementation efficiency.
 
-\noindent Despite the speed gap, \NP{} provides capabilities that
+\noindent Despite the speed gap, \CP{} provides capabilities that
 Glucose4 fundamentally lacks: (i)~its proofs are certified by a
 verified kernel (vs.\~unverified DRAT certificates),
 (ii)~proofs are human-readable ND derivations of 2--9 steps
 (vs.\~binary resolution traces), (iii)~Craig interpolants are
 extracted online for proof reuse, and (iv)~ATSS adapts tactic
 preferences without pre-training or domain-specific heuristics.
-On PHP$_4^{5}$, \NP{} correctly reports UNKNOWN at the
+On PHP$_4^{5}$, \CP{} correctly reports UNKNOWN at the
 500{,}000-conflict limit, consistent with the exponential resolution
 lower bound~\cite{BenSasson2002}.  We argue that an honest
 UNKNOWN is preferable to an incorrect SAT/UNSAT verdict in
@@ -1911,7 +1910,7 @@ design choice, not a bug.
   \centering
   \includegraphics[width=\linewidth]{figures/fig7_sota_comparison.pdf}
   \caption{Quantitative state-of-the-art comparison on PHP$_4^5$ and
-    random 3-CNF ($\alpha{=}4.0$). \NP{} is the only system achieving
+    random 3-CNF ($\alpha{=}4.0$). \CP{} is the only system achieving
     certified proofs, online learning, and zero pre-training
     simultaneously. Operation counts (not wall-clock time) enable
     fair algorithmic comparison.}
@@ -1986,7 +1985,7 @@ sizes across configurations confirm that tactic \emph{selection}
 \subsection{Experiment 9: ATSS Learning Dynamics \textnormal{(EXP-10)}}
 
 To evaluate ATSS's online learning capability, we compare
-\NP{}+\ATSS{} against \NP{} with ATSS disabled across 100 random
+\CP{}+\ATSS{} against \CP{} with ATSS disabled across 100 random
 provable formulas over multiple epochs.  Each epoch presents the
 same formulas in a new random order, allowing us to measure
 whether ATSS accumulates useful tactic preferences over repeated
@@ -2039,7 +2038,7 @@ size drops from 45 to 28 steps ($-38\%$); for $\PHP_4^5$, proof
 size drops from 68 to 34 steps ($-50\%$) and depth from 19 to
 12.  This reduction is consistent with the known exponential
 advantage of extended Frege over
-resolution~\cite{CookReckhow1979,Krajicek1995}.  While \NP{}'s
+resolution~\cite{CookReckhow1979,Krajicek1995}.  While \CP{}'s
 default CDCL kernel does not yet include the extension rule in
 the certified proof checker, this experiment demonstrates the
 potential of incorporating extended resolution as a certified
@@ -2049,7 +2048,7 @@ inference step within the hybrid calculus.
 
 \begin{enumerate}
   \item \textbf{(T1 --- Soundness, verified.)}  The Rocq
-    formalisation mechanically verifies that every \NP{} rule
+    formalisation mechanically verifies that every \CP{} rule
     preserves semantic validity.  The bridge lemma between
     \texttt{eval} and \texttt{interp} (induction on all 7
     connectives, \Cref{thm:soundness}) is the technical core of
@@ -2104,7 +2103,7 @@ inference step within the hybrid calculus.
     but Experiment~9 provides direct evidence for ATSS learning on
     structurally varied random instances (solve rate 57.6\% $\to$
     82.3\% over 10 epochs), and Experiment~5 demonstrates
-    a $7.5\times$ speedup of \NP{}+\ATSS{} over DPLL-Baseline on
+    a $7.5\times$ speedup of \CP{}+\ATSS{} over DPLL-Baseline on
     Easy instances---this gain \emph{depends on} the lemma table
     populated by the interpolation stage of the cycle.
     \textbf{(iii)~Lemma reuse growth:} the fraction of
@@ -2136,14 +2135,14 @@ inference step within the hybrid calculus.
     (Exp.~7), neural tactic selection (Exp.~8),
     online learning dynamics (Exp.~9), and extended
     resolution evaluation (Exp.~10).  This
-    comprehensive evaluation demonstrates \NP{}'s capabilities and
+    comprehensive evaluation demonstrates \CP{}'s capabilities and
     limitations across the full easy--hard--easy spectrum and
     validates the online learning hypothesis through multi-epoch
     ATSS convergence analysis.
     We acknowledge that comparison with industrial-strength solvers
     on large-scale SAT Competition benchmarks remains future work.
     \textbf{On the CDCL speed gap.}  As discussed in
-    \cref{sec:experiments}, we do not claim \NP{} as the fastest SAT
+    \cref{sec:experiments}, we do not claim \CP{} as the fastest SAT
     solver.  The value proposition is \emph{certified, readable proofs}
     produced by a \emph{dual-track verified kernel} with
     \emph{zero-pre-training online learning}.  In safety-critical
@@ -2154,7 +2153,7 @@ inference step within the hybrid calculus.
     these contexts.
 
   \item \textbf{Limitation: CDCL on resolution-hard instances.}
-    Like all CDCL-based systems, \NP{} hits the conflict limit on
+    Like all CDCL-based systems, \CP{} hits the conflict limit on
     PHP and Tseitin formulas.  Both families require exponential
     resolution proofs~\cite{BenSasson2002}.  Integrating \emph{extended
     resolution} (which polynomially simulates Frege) into the CDCL
@@ -2177,13 +2176,13 @@ inference step within the hybrid calculus.
 \section{Conclusion}
 \label{sec:conclusion}
 
-We have presented \NP{}, a hybrid propositional proof system that
+We have presented \CP{}, a hybrid propositional proof system that
 achieves three things simultaneously: (i)~\emph{certified} proof
 checking via a dual Python/Rocq verification chain; (ii)~\emph{automated}
 proof search via CDCL with Craig interpolation; and
 (iii)~\emph{adaptive} tactic guidance via online bandit learning.
 
-The virtuous cycle is the key architectural insight of \NP{}:
+The virtuous cycle is the key architectural insight of \CP{}:
 CDCL provides raw material for interpolation, which feeds ATSS
 with semantically meaningful lemmas, which guides proof search
 toward efficient decompositions via
@@ -2194,7 +2193,7 @@ analysis).  This integrated feedback architecture---where search
 (CDCL), learning (ATSS), lemma extraction (interpolation), and
 verification (dual Python/Rocq TCB) are not separate modules
 but mutually reinforcing stages of a single closed loop---is
-what distinguishes \NP{} from every existing proof system.
+what distinguishes \CP{} from every existing proof system.
 
 % ============================================================
 % Acknowledgements (anonymised for review)
@@ -2432,7 +2431,7 @@ logic without quantifiers, steps~(a) and~(b) are linear-time, and
 
 The composition of Steps~1--3 maps any Frege proof of $\varphi$ into
 a resolution refutation of $\neg\varphi$ of size $\poly(|\varphi|, s)$.
-Hence \NP{} (which extends resolution with lemma learning and
+Hence \CP{} (which extends resolution with lemma learning and
 interpolation cuts) p-simulates Frege.  $\hfill\square$
 
 \subsection{Proof of Lemma~\ref{lem:kalmar} (K\'{a}lm\'{a}r's Lemma)}
@@ -2601,7 +2600,7 @@ This establishes the claimed strict improvement.  $\hfill\square$
 
 \subsection{Full Rule Set}
 
-The complete set of rules in the \NP{} calculus (38 rules):
+The complete set of rules in the \CP{} calculus (38 rules):
 
 \medskip
 \textbf{Axiom-like:} AXIOM, TRUTH.
@@ -2618,7 +2617,7 @@ SC\_AND\_R, SC\_IMP\_R.
 
 \textbf{Resolution:} RES\_UNIT, RES\_FULL, RES\_FACTOR.
 
-\textbf{NeuroProof novel rules:} ADAPTIVE\_CUT
+\textbf{CertiProof novel rules:} ADAPTIVE\_CUT
 (\cref{def:adaptive-cut}), INTERPOLANT (\cref{sec:interpolation}),
 LEMMA\_REUSE (\cref{sec:interpolation}).
 

@@ -4,7 +4,7 @@ FINAL ATSS Learning Experiment for fig:atss-learning.
 Metrics: solve rate per epoch + proof size per epoch.
 Honest result: both ATSS and noATSS achieve 100% because structural
 tactics suffice on these simple formulas. The figure demonstrates
-that NeuroProof's proof framework works effectively from the first
+that CertiProof's proof framework works effectively from the first
 formula without pre-training.
 """
 import sys, os

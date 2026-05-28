@@ -2,7 +2,7 @@
 """
 plot_all_figures.py
 ====================
-Generate ALL publication-quality figures for the NeuroProof paper.
+Generate ALL publication-quality figures for the CertiProof paper.
 
 Reads CSV files from experiments/results/ and generates PDF figures
 in experiments/figures/.
@@ -54,14 +54,14 @@ plt.rcParams.update({
 
 # Color scheme
 COLORS = {
-    'NeuroProof+ATSS': '#1f77b4',
+    'CertiProof+ATSS': '#1f77b4',
     'NP+ATSS': '#1f77b4',
     'ATSS': '#1f77b4',
     'with_ATSS': '#1f77b4',
     'NP+ATSS+Ext': '#1f77b4',
     'DPLL-Baseline': '#ff7f0e',
     'Glucose4': '#2ca02c',
-    'NeuroProof-noATSS': '#d62728',
+    'CertiProof-noATSS': '#d62728',
     'noATSS': '#d62728',
     'without_ATSS': '#d62728',
     'GNN-ATSS': '#9467bd',
@@ -838,7 +838,7 @@ def plot_fig12_operation_costs():
     width = 0.35
 
     bars1 = ax.bar(x - width/2, python_costs, width, color='#d62728', alpha=0.85,
-                   label='Python (NeuroProof)', edgecolor='black', linewidth=0.5)
+                   label='Python (CertiProof)', edgecolor='black', linewidth=0.5)
     bars2 = ax.bar(x + width/2, c_costs, width, color='#2ca02c', alpha=0.85,
                    label='C/C++ (Glucose4)', edgecolor='black', linewidth=0.5)
 
@@ -870,7 +870,7 @@ def plot_fig12_operation_costs():
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("NeuroProof Figure Generator")
+    print("CertiProof Figure Generator")
     print("=" * 60)
     print(f"Reading CSVs from: {RESULTS_DIR}")
     print(f"Saving figures to: {FIGURES_DIR}")

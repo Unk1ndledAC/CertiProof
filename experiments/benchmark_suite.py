@@ -1,7 +1,7 @@
 """
 benchmark_suite.py
 ==================
-SOTA Benchmark Suite for NeuroProof evaluation.
+SOTA Benchmark Suite for CertiProof evaluation.
 
 Benchmarks:
   1. Random 3-CNF (phase transition) — standard SAT benchmark
@@ -15,7 +15,7 @@ Metrics compared against baselines:
   - MiniSAT (simulated via Python DPLL baseline)
   - ND-Only prover (without ATSS)
   - CDCL-Only (without interpolation)
-  - NeuroProof (full system)
+  - CertiProof (full system)
 
 References:
   - Hoos & Stützle (2000): SATLIB. http://www.satlib.org
@@ -39,7 +39,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.formula import Var, Not, And, Or, Implies, parse, Formula
-from src.solver import NeuroProofSolver, EXP3ATSS, ATSS, SolverStatus, Clause
+from src.solver import CertiProofSolver, EXP3ATSS, ATSS, SolverStatus, Clause
 from src.tactic import TacticEngine, tauto
 from src.proof import Proof
 
@@ -376,12 +376,12 @@ class ExperimentRunner:
         os.makedirs(output_dir, exist_ok=True)
         self._results: List[BenchmarkResult] = []
 
-    def _run_neuroproof(self, name: str, iid: int,
+    def _run_certiproof(self, name: str, iid: int,
                          clauses: List[Clause],
                          timeout: float = 60.0,
                          max_conflicts: int = 50_000) -> BenchmarkResult:
         atss = ATSS()
-        solver = NeuroProofSolver(exp3_atss=atss, max_conflicts=max_conflicts)
+        solver = CertiProofSolver(exp3_atss=atss, max_conflicts=max_conflicts)
         all_vars: set = set()
         for c in clauses:
             for v, _ in c:
@@ -394,7 +394,7 @@ class ExperimentRunner:
             return BenchmarkResult(
                 name=name, instance_id=iid,
                 n_vars=len(all_vars), n_clauses=len(clauses),
-                status='ERROR', solver='NeuroProof',
+                status='ERROR', solver='CertiProof',
                 time_sec=time.perf_counter() - t0)
 
         elapsed = time.perf_counter() - t0
@@ -410,7 +410,7 @@ class ExperimentRunner:
         return BenchmarkResult(
             name=name, instance_id=iid,
             n_vars=len(all_vars), n_clauses=len(clauses),
-            status=status, solver='NeuroProof',
+            status=status, solver='CertiProof',
             time_sec=elapsed,
             decisions=result.stats.get('decisions', 0),
             conflicts=result.stats.get('conflicts', 0),
@@ -464,7 +464,7 @@ class ExperimentRunner:
             for trial in range(n_trials):
                 clauses = gen_random_3cnf(n_vars, n_clauses,
                                            seed=trial * 1000 + n_clauses)
-                r_np = self._run_neuroproof(
+                r_np = self._run_certiproof(
                     f"rand3cnf_n{n_vars}_r{ratio:.1f}", trial, clauses)
                 r_dp = self._run_dpll(
                     f"rand3cnf_n{n_vars}_r{ratio:.1f}", trial, clauses)
@@ -483,12 +483,12 @@ class ExperimentRunner:
         print(f"\n[EXP-2] Pigeonhole PHP_n, n = 2 .. {max_n}")
         for n in range(2, max_n + 1):
             clauses = gen_pigeonhole(n)
-            r_np = self._run_neuroproof(f"PHP_{n}", 0, clauses, timeout=120.0)
+            r_np = self._run_certiproof(f"PHP_{n}", 0, clauses, timeout=120.0)
             r_dp = self._run_dpll(f"PHP_{n}", 0, clauses, timeout=120.0)
             r_gl = self._run_pysat(f"PHP_{n}", 0, clauses, timeout=120.0)
             self._results.extend([r_np, r_dp, r_gl])
             print(f"  PHP_{n}: vars={r_np.n_vars}, clauses={r_np.n_clauses}, "
-                  f"NeuroProof={r_np.status}({r_np.time_sec:.3f}s), "
+                  f"CertiProof={r_np.status}({r_np.time_sec:.3f}s), "
                   f"DPLL={r_dp.status}({r_dp.time_sec:.3f}s), "
                   f"Glucose4={r_gl.status}({r_gl.time_sec:.3f}s)")
 
@@ -500,7 +500,7 @@ class ExperimentRunner:
         for n in [5, 8, 10, 12, 15]:
             for t in range(n_trials):
                 clauses = gen_tseitin(n, density=0.5, seed=t)
-                r_np = self._run_neuroproof(f"Tseitin_n{n}", t, clauses)
+                r_np = self._run_certiproof(f"Tseitin_n{n}", t, clauses)
                 r_gl = self._run_pysat(f"Tseitin_n{n}", t, clauses)
                 self._results.extend([r_np, r_gl])
 
@@ -509,8 +509,8 @@ class ExperimentRunner:
     def exp_proof_quality(self) -> None:
         """
         Compare proof size (number of steps) and depth between:
-          - NeuroProof with ATSS
-          - NeuroProof without ATSS (solver-only fallback)
+          - CertiProof with ATSS
+          - CertiProof without ATSS (solver-only fallback)
         """
         print(f"\n[EXP-4] Proof quality: ATSS vs no-ATSS baseline")
         test_formulas = [
@@ -548,7 +548,7 @@ class ExperimentRunner:
                 r_atss = BenchmarkResult(
                     name=f"tauto({fstr})", instance_id=0,
                     n_vars=len(f.variables()), n_clauses=0,
-                    status='PROVED', solver='NeuroProof+ATSS',
+                    status='PROVED', solver='CertiProof+ATSS',
                     time_sec=elapsed,
                     proof_size=proof.size,
                     proof_depth=proof.depth)
@@ -556,7 +556,7 @@ class ExperimentRunner:
                 r_atss = BenchmarkResult(
                     name=f"tauto({fstr})", instance_id=0,
                     n_vars=len(f.variables()), n_clauses=0,
-                    status=f'FAIL:{e}', solver='NeuroProof+ATSS',
+                    status=f'FAIL:{e}', solver='CertiProof+ATSS',
                     time_sec=0.0)
 
             # Without ATSS (solver fallback only)
@@ -567,7 +567,7 @@ class ExperimentRunner:
                 r_noatss = BenchmarkResult(
                     name=f"tauto({fstr})", instance_id=1,
                     n_vars=len(f.variables()), n_clauses=0,
-                    status='PROVED', solver='NeuroProof-noATSS',
+                    status='PROVED', solver='CertiProof-noATSS',
                     time_sec=elapsed,
                     proof_size=proof.size,
                     proof_depth=proof.depth)
@@ -575,7 +575,7 @@ class ExperimentRunner:
                 r_noatss = BenchmarkResult(
                     name=f"tauto({fstr})", instance_id=1,
                     n_vars=len(f.variables()), n_clauses=0,
-                    status=f'FAIL:{e}', solver='NeuroProof-noATSS',
+                    status=f'FAIL:{e}', solver='CertiProof-noATSS',
                     time_sec=0.0)
 
             self._results.extend([r_atss, r_noatss])
@@ -633,7 +633,7 @@ class ExperimentRunner:
                     n_vars=depth,
                     n_clauses=epoch_size,
                     status='PROVED' if solve_rate >= 0.5 else 'PARTIAL',
-                    solver='NeuroProof+ATSS',
+                    solver='CertiProof+ATSS',
                     time_sec=elapsed,
                     decisions=epoch_solved,   # repurposed: solved count
                     conflicts=epoch_size - epoch_solved,  # repurposed: failed count
@@ -651,17 +651,17 @@ class ExperimentRunner:
         and ATSS by comparing:
           1. DPLL-Baseline (no learning, no ATSS)
           2. Glucose4 (SOTA CDCL solver)
-          3. NeuroProof (full: CDCL + ATSS)
+          3. CertiProof (full: CDCL + ATSS)
 
         On: random 3-CNF instances at varying difficulty levels.
         """
-        print(f"\n[EXP-6] Ablation Study: DPLL vs Glucose4 vs NeuroProof")
+        print(f"\n[EXP-6] Ablation Study: DPLL vs Glucose4 vs CertiProof")
 
         # Part A: Easy SAT instances (ratio 2.0, n=20)
         print("  [Part A] Easy random 3-CNF (ratio=2.0, n=20)")
         for trial in range(10):
             clauses = gen_random_3cnf(20, 40, seed=trial * 1000 + 200)
-            r_np = self._run_neuroproof("ablation_easy", trial, clauses)
+            r_np = self._run_certiproof("ablation_easy", trial, clauses)
             r_dp = self._run_dpll("ablation_easy", trial, clauses)
             r_gl = self._run_pysat("ablation_easy", trial, clauses)
             self._results.extend([r_np, r_dp, r_gl])
@@ -670,7 +670,7 @@ class ExperimentRunner:
         print("  [Part B] Hard random 3-CNF (ratio=6.0, n=20)")
         for trial in range(5):
             clauses = gen_random_3cnf(20, 120, seed=trial * 1000 + 600)
-            r_np = self._run_neuroproof("ablation_hard", trial, clauses,
+            r_np = self._run_certiproof("ablation_hard", trial, clauses,
                                         timeout=60)
             r_dp = self._run_dpll("ablation_hard", trial, clauses,
                                   timeout=10)
@@ -682,7 +682,7 @@ class ExperimentRunner:
         print("  [Part C] Phase transition (ratio=4.3, n=20)")
         for trial in range(5):
             clauses = gen_random_3cnf(20, 86, seed=trial * 1000 + 430)
-            r_np = self._run_neuroproof("ablation_phase", trial, clauses)
+            r_np = self._run_certiproof("ablation_phase", trial, clauses)
             r_dp = self._run_dpll("ablation_phase", trial, clauses,
                                   timeout=10)
             r_gl = self._run_pysat("ablation_phase", trial, clauses,
@@ -707,7 +707,7 @@ class ExperimentRunner:
             for trial in range(n_instances):
                 clauses = gen_random_3cnf(
                     n_vars, n_clauses, seed=n_vars * 10000 + trial)
-                r_np = self._run_neuroproof(
+                r_np = self._run_certiproof(
                     f"scale_n{n_vars}", trial, clauses)
                 r_dp = self._run_dpll(
                     f"scale_n{n_vars}", trial, clauses)
@@ -720,17 +720,17 @@ class ExperimentRunner:
 
     def exp_sota_comparison(self) -> None:
         """
-        EXP-8: SOTA comparison — DPLL, Glucose4, NeuroProof+ATSS on:
+        EXP-8: SOTA comparison — DPLL, Glucose4, CertiProof+ATSS on:
           A) PHP_n for n = 2..5
           B) Random 3-CNF at ratios 2.0, 3.0, 4.0, 5.0 (n=30)
         """
-        print(f"\n[EXP-8] SOTA Comparison: DPLL vs Glucose4 vs NeuroProof+ATSS")
+        print(f"\n[EXP-8] SOTA Comparison: DPLL vs Glucose4 vs CertiProof+ATSS")
 
         # Part A: Pigeonhole
         print("  [Part A] Pigeonhole Principle")
         for n in range(2, 6):
             clauses = gen_pigeonhole(n)
-            r_np = self._run_neuroproof(f"sota_PHP_{n}", 0, clauses, timeout=120)
+            r_np = self._run_certiproof(f"sota_PHP_{n}", 0, clauses, timeout=120)
             r_dp = self._run_dpll(f"sota_PHP_{n}", 0, clauses, timeout=120)
             r_gl = self._run_pysat(f"sota_PHP_{n}", 0, clauses, timeout=120)
             self._results.extend([r_np, r_dp, r_gl])
@@ -746,7 +746,7 @@ class ExperimentRunner:
                 clauses = gen_random_3cnf(
                     n_vars, int(ratio * n_vars),
                     seed=int(ratio * 1000) + trial)
-                r_np = self._run_neuroproof(
+                r_np = self._run_certiproof(
                     f"sota_rand3cnf_r{ratio:.1f}", trial, clauses)
                 r_dp = self._run_dpll(
                     f"sota_rand3cnf_r{ratio:.1f}", trial, clauses)
@@ -965,7 +965,7 @@ class ExperimentRunner:
     def run_all(self, exp_ids: Optional[List[int]] = None) -> str:
         """Run the complete benchmark suite. If exp_ids is None, run all (1-9)."""
         print("=" * 60)
-        print(" NeuroProof SOTA Benchmark Suite")
+        print(" CertiProof SOTA Benchmark Suite")
         print("=" * 60)
         experiments = {
             1: lambda: self.exp_random_3cnf(n_vars=20, n_trials=10),
@@ -1022,7 +1022,7 @@ def _gen_random_tautology(depth: int, rng: random.Random) -> Formula:
 
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser(description='NeuroProof Benchmark Suite')
+    parser = argparse.ArgumentParser(description='CertiProof Benchmark Suite')
     parser.add_argument('--exp', type=str, default=None,
                         help='Experiments to run, e.g. "1-3,6,8" or "all"')
     args = parser.parse_args()

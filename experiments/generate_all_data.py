@@ -2,7 +2,7 @@
 """
 generate_all_data.py
 ====================
-Generate ALL experiment data CSVs for the NeuroProof paper.
+Generate ALL experiment data CSVs for the CertiProof paper.
 
 Each experiment writes its CSV to experiments/results/.
 Uses the theoretical/operation-primitive analysis framework from
@@ -48,10 +48,10 @@ GLUCOSE4_FACTOR = 1.0 / 200.0
 
 # Solver colors (for reference)
 SOLVER_COLORS = {
-    'NeuroProof+ATSS': '#1f77b4',
+    'CertiProof+ATSS': '#1f77b4',
     'DPLL-Baseline': '#ff7f0e',
     'Glucose4': '#2ca02c',
-    'NeuroProof-noATSS': '#d62728',
+    'CertiProof-noATSS': '#d62728',
 }
 
 random.seed(42)
@@ -738,7 +738,7 @@ def _write_csv(filepath, rows, columns):
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("NeuroProof Experiment Data Generator")
+    print("CertiProof Experiment Data Generator")
     print("=" * 60)
     print(f"Output directory: {RESULTS_DIR}\n")
 

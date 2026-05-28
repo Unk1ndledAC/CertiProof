@@ -9,7 +9,7 @@
 \usepackage[top=1.2in, bottom=1.2in, left=1.2in, right=1.2in]{geometry}
 
 % --- Convenience macros ---
-\newcommand{\NP}{\textsc{NeuroProof}}
+\newcommand{\CP}{\textsc{CertiProof}}
 \newcommand{\ATSS}{\textsc{ATSS}}
 
 % --- Suppress page number on page 1 ---
@@ -25,25 +25,25 @@
 \opening{}
 
 We respectfully submit our manuscript entitled
-``\textbf{NeuroProof: A Hybrid Propositional Proof System with
+``\textbf{CertiProof: A Hybrid Propositional Proof System with
   Adaptive Tactic Synthesis and Certified Proof Checking}''
 for consideration at \textbf{CAV~2027}.
 
-\textbf{What \NP{} is (and is not).}
-\NP{} is a \emph{certified hybrid proof system} that combines
+\textbf{What \CP{} is (and is not).}
+\CP{} is a \emph{certified hybrid proof system} that combines
 automated SAT solving with interactive theorem proving through
 adaptive tactic synthesis.
-We must emphasise at the outset: \textbf{\NP{} is NOT a SAT solver.}
+We must emphasise at the outset: \textbf{\CP{} is NOT a SAT solver.}
 It is a \emph{proof generator} whose primary objectives are
 (i)~producing independently verifiable, human-readable natural
 deduction proofs under the de~Bruijn criterion, and
 (ii)~enabling automated tactic learning without pre-trained data.
 Raw solving speed is a secondary concern that we measure honestly
-but do not optimise for.  Confusing \NP{} with a SAT solver
+but do not optimise for.  Confusing \CP{} with a SAT solver
 would miss its entire contribution.
 
 \textbf{Unique value proposition.}
-To the best of our knowledge, \NP{} is \textbf{the only system
+To the best of our knowledge, \CP{} is \textbf{the only system
 that produces certified, human-readable natural deduction proofs
 with zero pre-training}.  The system operates from the very first
 proof attempt---no offline corpus, no curated training data, no
@@ -52,11 +52,11 @@ proof-search session via EXP3-ATSS, an adversarial-bandit framework
 with provable $O(\sqrt{KT\ln K})$ regret guarantees under non-i.i.d.\
 formula sequences.  All neural and neural-symbolic alternatives
 (DeepSeek-Prover, AlphaProof, DreamProver, LeanAgent) require
-substantial offline pre-training on curated proof corpora; \NP{}
+substantial offline pre-training on curated proof corpora; \CP{}
 eliminates this dependence entirely.
 
 \textbf{Double formalisation --- soundness \emph{and} completeness.}
-A distinguishing strength of \NP{} is its \textbf{double-track
+A distinguishing strength of \CP{} is its \textbf{double-track
 verification} in Rocq~9.0 with \textbf{zero admitted proofs}:
 \begin{enumerate}
   \item \textbf{Soundness} (full mechanisation): every inference rule
@@ -75,7 +75,7 @@ verification} in Rocq~9.0 with \textbf{zero admitted proofs}:
 \end{enumerate}
 Together, these two theorems provide a \emph{two-tier} completeness
 guarantee---the ND fragment alone is absolute-complete
-(K\'{a}lm\'{a}r), while the full \NP{} calculus is
+(K\'{a}lm\'{a}r), while the full \CP{} calculus is
 efficient-complete (p-simulation of Frege).  We are not aware of any
 other proof system with both soundness and constructive completeness
 machine-checked in a proof assistant at this level of detail.
@@ -86,23 +86,23 @@ A methodological contribution of this work is the
 which decomposes solver runtime into (i)~the number of algorithmic
 operations performed, and (ii)~the per-operation cost in the
 implementation language.  This decouples algorithmic efficiency from
-implementation efficiency, enabling a fair comparison of \NP{}'s
+implementation efficiency, enabling a fair comparison of \CP{}'s
 algorithmic core with industrial-strength C/C++ solvers.  The
-empirical result is that the \NP{} kernel performs operation counts
+empirical result is that the \CP{} kernel performs operation counts
 within $\sim 700\times$ of Glucose4 (not $\sim 125{,}000\times$
 as wall-clock times suggest), consistent with the $\sim 200\times$
 Python/C++ efficiency factor and the interpolation overhead unique
-to \NP{}.
+to \CP{}.
 
 \textbf{Addressing the speed comparison with industrial solvers.}
 We anticipate that reviewers will ask about the runtime gap between
-\NP{} (Python~3.12) and industrial SAT solvers (C/C++).  We address
+\CP{} (Python~3.12) and industrial SAT solvers (C/C++).  We address
 this head-on:
 \begin{quote}
-  \textbf{\NP{} is NOT a SAT solver --- it is a certified proof
+  \textbf{\CP{} is NOT a SAT solver --- it is a certified proof
   generator.}  The $\sim 200\times$ Python/C++ gap is an
   \emph{implementation artifact}, not an algorithmic deficiency.
-  Factor out language overhead, and \NP{}'s CDCL kernel performs
+  Factor out language overhead, and \CP{}'s CDCL kernel performs
   within a factor of 25--35 of Kissat on equivalent operation counts.
   The remaining gap is the price of certification: every conflict
   produces a Craig interpolant and a verified proof step---operations
@@ -113,14 +113,14 @@ this head-on:
 \end{quote}
 
 \textbf{Architectural innovation: the virtuous cycle.}
-The central architectural insight of \NP{} is the \emph{virtuous
+The central architectural insight of \CP{} is the \emph{virtuous
 cycle} that links its four components: (1)~CDCL conflict analysis
 produces learned clauses, which feed (2)~incremental Craig
 interpolation to extract semantically meaningful interpolants,
 which populate (3)~the ATSS lemma table to guide tactic selection,
 whose successful proofs in turn (4)~provide reward signals back to
 ATSS, closing the loop.  This integrated feedback architecture
-distinguishes \NP{} from systems that treat search, learning, and
+distinguishes \CP{} from systems that treat search, learning, and
 verification as separate modules.  The cycle improves monotonically
 within a single proof-search session---no offline retraining needed.
 
@@ -142,13 +142,13 @@ within a single proof-search session---no offline retraining needed.
 \end{enumerate}
 
 \textbf{Relevance to CAV 2027 / CPP 2027.}
-For \textbf{CAV~2027}, \NP{} contributes to formal verification by
+For \textbf{CAV~2027}, \CP{} contributes to formal verification by
 providing a \emph{dual-track certified proof kernel} whose entire
 calculus is machine-checked---a stronger guarantee than post-hoc DRAT
 certification.  The adaptive tactic synthesis framework is directly
 relevant to the automation of interactive verification tasks.
 
-We believe \NP{} offers a novel perspective at the intersection of
+We believe \CP{} offers a novel perspective at the intersection of
 proof complexity, automated reasoning, and formal verification, and
 we hope you will find it suitable for your venue.
 

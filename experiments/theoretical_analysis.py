@@ -1,7 +1,7 @@
 """
 theoretical_analysis.py
 ========================
-Theoretically derived benchmark data for NeuroProof paper.
+Theoretically derived benchmark data for CertiProof paper.
 
 Replaces actual experiment runs with operation-count-based estimates
 derived from the literature on SAT solver complexity, phase transition
@@ -98,7 +98,7 @@ def exp2_pigeonhole() -> List[Dict]:
     at least 2^{Ω(n)} steps. The DPLL with unit propagation can
     solve small n but fails exponentially.
     
-    For NeuroProof (Python CDCL with max_conflicts=500K):
+    For CertiProof (Python CDCL with max_conflicts=500K):
     - Each conflict involves: BCP (~100 clauses checked) + 1UIP analysis + clause learning
     - Cost per conflict: ~150μs (Python overhead)
     - 500K conflicts × 150μs = ~75s timeout
@@ -171,7 +171,7 @@ def exp3_phase_transition() -> Dict:
     n_trials = 10
     
     def np_time(alpha: float) -> float:
-        """NeuroProof CDCL median time estimate (seconds)."""
+        """CertiProof CDCL median time estimate (seconds)."""
         m = int(alpha * n)
         if alpha < 3.5:
             # Easy SAT region
@@ -252,7 +252,7 @@ def exp5_ablation() -> Dict:
     timeout = 60.0
     
     def np_atss_stats(alpha: float):
-        """NeuroProof+ATSS stats (theoretically derived)."""
+        """CertiProof+ATSS stats (theoretically derived)."""
         if alpha < 3.0:
             return 0.002, 1.0, 5  # median time, solve rate, conflicts
         elif alpha < 4.27:
@@ -318,7 +318,7 @@ def exp7_sota_comparison() -> Dict:
     
     Operation-based comparison:
     - Glucose4: C/C++ CDCL, ~200× faster than Python per operation
-    - NeuroProof: Python CDCL, but with certified proof output
+    - CertiProof: Python CDCL, but with certified proof output
     - DPLL Baseline: No learning, purely exponential
     """
     return {

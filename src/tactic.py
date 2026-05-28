@@ -1,7 +1,7 @@
 """
 tactic.py
 =========
-High-level tactic engine for NeuroProof.
+High-level tactic engine for CertiProof.
 
 This module provides a *tactic-based* interface on top of the core
 proof calculus, analogous to Coq's tactic language but implemented in
@@ -31,7 +31,7 @@ from .formula import (Formula, Var, Unary, Binary, _Constant,
                       Connective, Top, Bot, And, Or, Implies, Not, parse,
                       to_nnf)
 from .proof import Proof, ProofStep, ProofBuilder, Rule
-from .solver import NeuroProofSolver, EXP3ATSS, ATSS, SolverStatus, InterpolantExtractor
+from .solver import CertiProofSolver, EXP3ATSS, ATSS, SolverStatus, InterpolantExtractor
 from .kernel import KernelError
 
 # Lazy import of GNN ATSS (optional, requires torch + torch_geometric)
@@ -103,7 +103,7 @@ class TacticResult:
 
 class TacticEngine:
     """
-    The NeuroProof tactic engine.
+    The CertiProof tactic engine.
 
     Provides a library of reusable proof tactics, ordered by the ATSS
     policy.  Each tactic either closes the goal, decomposes it into
@@ -121,7 +121,7 @@ class TacticEngine:
                  gnn_atss: Optional['GNNATSS'] = None,
                  use_fallback: bool = True) -> None:
         self._atss = atss or ATSS()
-        self._solver = NeuroProofSolver(exp3_atss=self._atss)
+        self._solver = CertiProofSolver(exp3_atss=self._atss)
         self._max_depth = max_depth
         self._pb: Optional[ProofBuilder] = None
         # GNN-based tactic selection (optional enhancement over cosine ATSS)
@@ -727,7 +727,7 @@ class TacticEngine:
     def _tactic_lemma_learn(self, goal: Goal,
                              hyp_steps: Dict[str, ProofStep]) -> TacticResult:
         """
-        LEMMA_LEARN (NeuroProof novel rule):
+        LEMMA_LEARN (CertiProof novel rule):
         Promote a CDCL-learned conflict clause to an ND lemma.
 
         When the CDCL solver derives a useful conflict clause during
@@ -776,7 +776,7 @@ class TacticEngine:
                                     hyp_steps: Dict[str, ProofStep]
                                     ) -> TacticResult:
         """
-        INTERPOLATION_GUIDED_CUT (NeuroProof novel rule):
+        INTERPOLATION_GUIDED_CUT (CertiProof novel rule):
         Decompose a goal A ⊢ C using Craig interpolation.
 
         Given a goal where we need to prove A ⊢ C:
@@ -972,7 +972,7 @@ class TacticEngine:
 
         decomposing.sort(key=lambda x: -x[0])
 
-        # Phase 3: novel NeuroProof tactics (LEMMA_LEARN, INTERPOLATION_CUT)
+        # Phase 3: novel CertiProof tactics (LEMMA_LEARN, INTERPOLATION_CUT)
         novel = [
             (_blended_score('lemma_learn', 0.3), self._tactic_lemma_learn),
             (_blended_score('interpolation_cut', 0.2),
@@ -995,7 +995,7 @@ def tauto(formula: Formula,
            *,
            gnn_atss: Optional['GNNATSS'] = None) -> Proof:
     """
-    Prove a tautology or theorem under hypotheses using NeuroProof.
+    Prove a tautology or theorem under hypotheses using CertiProof.
 
     Parameters
     ----------

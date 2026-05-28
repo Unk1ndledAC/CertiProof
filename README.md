@@ -1,10 +1,10 @@
-# NeuroProof
+# CertiProof
 
 **A Hybrid Propositional Proof System with Adaptive Tactic Synthesis and Certified Proof Checking**
 
-NeuroProof is a hybrid propositional proof system that combines natural deduction, sequent calculus, and resolution with five novel rules: ADAPTIVE\_CUT, LEMMA\_REUSE, INTERPOLANT, LEMMA\_LEARN, and INTERPOLATION\_GUIDED\_CUT. It features **EXP3-ATSS** (adversarial bandit-based Adaptive Tactic Synthesis System) that guides proof search online without pre-training, a full CDCL solver with incremental Craig interpolation, and mechanical soundness verification in Rocq/Coq.
+CertiProof is a hybrid propositional proof system that combines natural deduction, sequent calculus, and resolution with five novel rules: ADAPTIVE\_CUT, LEMMA\_REUSE, INTERPOLANT, LEMMA\_LEARN, and INTERPOLATION\_GUIDED\_CUT. It features **EXP3-ATSS** (adversarial bandit-based Adaptive Tactic Synthesis System) that guides proof search online without pre-training, a full CDCL solver with incremental Craig interpolation, and mechanical soundness verification in Rocq/Coq.
 
-> **Positioning**: NeuroProof is a **certified proof system**, not a raw SAT solver. Its primary goals are: (1) producing human-readable, independently verifiable proofs, (2) learning proof strategies online without pre-training data, and (3) maintaining a minimal Trusted Computing Base under the de Bruijn criterion.
+> **Positioning**: CertiProof is a **certified proof system**, not a raw SAT solver. Its primary goals are: (1) producing human-readable, independently verifiable proofs, (2) learning proof strategies online without pre-training data, and (3) maintaining a minimal Trusted Computing Base under the de Bruijn criterion.
 
 ## Key Features
 
@@ -24,7 +24,7 @@ NeuroProof is a hybrid propositional proof system that combines natural deductio
 ### 1. Verify Installation
 
 ```bash
-cd NeuroProof
+cd CertiProof
 python verify_installation.py
 ```
 
@@ -58,13 +58,13 @@ python experiments/plot_all_figures.py
 
 ```bash
 cd coq
-coqc NeuroProof.v   # ~2 seconds compile time
+coqc CertiProof.v   # ~2 seconds compile time
 ```
 
 ## Project Structure
 
 ```
-NeuroProof/
+CertiProof/
 ├── src/                          # Core library (pure Python)
 │   ├── __init__.py               # Public API exports
 │   ├── formula.py                # Formula AST, parser, NNF/CNF (via Tseitin)
@@ -106,9 +106,9 @@ NeuroProof/
 │       ├── fig11_frege_extension.pdf
 │       └──  fig12_operation_costs.pdf
 ├── coq/
-│   └── NeuroProof.v              # Rocq 9.0 formalisation (1171 lines)
+│   └── CertiProof.v              # Rocq 9.0 formalisation (1171 lines)
 ├── paper/
-│   ├── neuroproof.tex            # IEEEtrans formatted paper
+│   ├── certiproof.tex            # IEEEtrans formatted paper
 │   ├── cover_letter.tex          # Cover letter for submission
 │   ├── references.bib            # Bibliography (50+ entries)
 │   ├── IEEEtran.cls              # IEEE style
@@ -149,7 +149,7 @@ NeuroProof/
 ## Public API
 
 ```python
-from src import Var, Not, And, Or, Implies, parse, tauto, decide, NeuroProofSolver
+from src import Var, Not, And, Or, Implies, parse, tauto, decide, CertiProofSolver
 
 # Parse and prove a tautology
 f = parse("(p -> q) -> ((not q) -> (not p))")  # contrapositive
@@ -161,8 +161,8 @@ result = decide(parse("p | q"))
 print(f"Status: {result}")  # SAT
 
 # CDCL solving via clause interface
-from src.solver import NeuroProofSolver, Clause
-solver = NeuroProofSolver(max_conflicts=10000, use_interpolation=True)
+from src.solver import CertiProofSolver, Clause
+solver = CertiProofSolver(max_conflicts=10000, use_interpolation=True)
 clauses = [
     frozenset([('x1', True), ('x2', True)]),
     frozenset([('x1', False), ('x2', True)]),
@@ -180,7 +180,7 @@ if result.interpolant:
 
 ### Trusted Computing Base (TCB)
 
-The verification kernel (`kernel.py`, 303 LOC) is intentionally minimal. Every proof step is verified by structural pattern-matching against rule definitions. All untrusted components (ATSS, solver, interpolation, GNN) produce `ProofStep` objects that must pass through the kernel. A bug in untrusted code cannot produce a false proof that passes verification. The same 38 rules are independently formalised and machine-checked in Rocq 9.0 (`NeuroProof.v`, 1171 LOC, 0 admits).
+The verification kernel (`kernel.py`, 303 LOC) is intentionally minimal. Every proof step is verified by structural pattern-matching against rule definitions. All untrusted components (ATSS, solver, interpolation, GNN) produce `ProofStep` objects that must pass through the kernel. A bug in untrusted code cannot produce a false proof that passes verification. The same 38 rules are independently formalised and machine-checked in Rocq 9.0 (`CertiProof.v`, 1171 LOC, 0 admits).
 
 ### EXP3-ATSS (Adversarial Bandit Tactic Synthesis)
 
@@ -243,11 +243,11 @@ Pudlák's resolution-based interpolation algorithm with incremental computation:
 - **Rocq formalisation**: 1171 lines, Rocq 9.0, 0 admits — all theorems fully proved (soundness, Kálmár completeness, interpolation correctness)
 - **Operation-primitive analysis**: Decoupled algorithmic efficiency from implementation language — verified that NP's algorithm performs comparably to industrial solvers when Python/C++ overhead factored out
 
-> **On CDCL speed**: NeuroProof is a Python research prototype focused on certified proof generation, not raw SAT solving speed. Industrial solvers (Glucose4) are C/C++ implementations with 20+ years of optimization. The paper uses **operation-primitive analysis** (§2.1) to decouple algorithmic efficiency from implementation efficiency, showing that NeuroProof's algorithm performs comparably to industrial solvers when the ~200× Python/C++ overhead is factored out. NeuroProof's unique value lies in producing human-readable, independently verifiable proofs with zero pre-training — capabilities that industrial solvers do not provide. See [Evaluation.md](Evaluation.md) §6 for detailed discussion.
+> **On CDCL speed**: CertiProof is a Python research prototype focused on certified proof generation, not raw SAT solving speed. Industrial solvers (Glucose4) are C/C++ implementations with 20+ years of optimization. The paper uses **operation-primitive analysis** (§2.1) to decouple algorithmic efficiency from implementation efficiency, showing that CertiProof's algorithm performs comparably to industrial solvers when the ~200× Python/C++ overhead is factored out. CertiProof's unique value lies in producing human-readable, independently verifiable proofs with zero pre-training — capabilities that industrial solvers do not provide. See [Evaluation.md](Evaluation.md) §6 for detailed discussion.
 
 ### Operation-Primitive Analysis
 
-Operation-primitive analysis is a methodology for fair benchmarking across solvers implemented in different languages. Instead of comparing wall-clock time directly (which conflates algorithmic efficiency with implementation language overhead), it decomposes solver execution into **operation primitives** — atomic operations like clause visits, variable assignments, and BCP propagations — and counts each primitive as a single time unit. This eliminates the ~200× Python/C++ speed gap and reveals that NeuroProof's CDCL algorithm performs comparably to industrial solvers at the algorithmic level. EXP-3 through EXP-12 use this methodology to produce theoretically derived data.
+Operation-primitive analysis is a methodology for fair benchmarking across solvers implemented in different languages. Instead of comparing wall-clock time directly (which conflates algorithmic efficiency with implementation language overhead), it decomposes solver execution into **operation primitives** — atomic operations like clause visits, variable assignments, and BCP propagations — and counts each primitive as a single time unit. This eliminates the ~200× Python/C++ speed gap and reveals that CertiProof's CDCL algorithm performs comparably to industrial solvers at the algorithmic level. EXP-3 through EXP-12 use this methodology to produce theoretically derived data.
 
 ### Key Theorems
 
@@ -265,8 +265,8 @@ Operation-primitive analysis is a methodology for fair benchmarking across solve
 This project was archived in Zenodo [![DOI](https://zenodo.org/badge/1230812812.svg)](https://doi.org/10.5281/zenodo.20382686).
 
 ```bibtex
-@article{qu2026neuroproof,
-  title={NeuroProof: A Hybrid Propositional Proof System with
+@article{qu2026certiproof,
+  title={CertiProof: A Hybrid Propositional Proof System with
          Adaptive Tactic Synthesis and Certified Proof Checking},
   author={Qu, Guanheng and Zhang, Chunxiao and Liu, Jiangming},
   journal={},

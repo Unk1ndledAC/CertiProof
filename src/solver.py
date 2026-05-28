@@ -1,7 +1,7 @@
 """
 solver.py
 =========
-NeuroProof Propositional Solver: an industrial-strength CDCL SAT solver
+CertiProof Propositional Solver: an industrial-strength CDCL SAT solver
 with integrated proof logging, EXP3-based Adaptive Tactic Synthesis,
 incremental Craig interpolation, and lemma learning.
 
@@ -23,7 +23,7 @@ with five novel components:
   3. LEMMA_LEARN:
      Promotes CDCL-learned conflict clauses to natural deduction
      lemmas, bridging CNF-level clause learning and ND-level proof
-     construction. This is a novel contribution of NeuroProof.
+     construction. This is a novel contribution of CertiProof.
 
   4. Incremental Craig Interpolation:
      Computes partial interpolants during CDCL search rather than
@@ -767,7 +767,7 @@ class SolverResult:
     time_sec: float                       = 0.0
 
 
-class NeuroProofSolver:
+class CertiProofSolver:
     """
     Industrial-strength CDCL SAT solver with:
       - Two-Watched Literal BCP (O(1) per-clause propagation)
@@ -1357,7 +1357,7 @@ class NeuroProofSolver:
     @staticmethod
     def _cnf_to_clauses(cnf: Formula) -> List[Clause]:
         clauses: List[Clause] = []
-        NeuroProofSolver._collect_clauses(cnf, clauses)
+        CertiProofSolver._collect_clauses(cnf, clauses)
         return clauses
 
     @staticmethod

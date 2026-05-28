@@ -1,9 +1,9 @@
 """
 proof.py
 ========
-Proof objects and formal derivation rules for NeuroProof.
+Proof objects and formal derivation rules for CertiProof.
 
-This module implements the *proof calculus* of NeuroProof, a hybrid system
+This module implements the *proof calculus* of CertiProof, a hybrid system
 combining three complementary rule sets:
 
   1. Natural Deduction (ND) — Prawitz-style introduction/elimination rules
@@ -81,7 +81,7 @@ class Rule(Enum):
     RES_FULL     = auto()   # full resolution step
     RES_FACTOR   = auto()   # factoring
 
-    # NeuroProof — novel rules (contributions of this paper)
+    # CertiProof — novel rules (contributions of this paper)
     ADAPTIVE_CUT            = auto()  # learned cut formula selection
     INTERPOLANT             = auto()  # Craig interpolation step
     LEMMA_REUSE             = auto()  # proof graph edge reuse
@@ -156,7 +156,7 @@ class Proof:
       - ``depth``: length of the longest proof path
       - ``is_theorem``: True iff there are no undischarged assumptions
       - ``to_dag()``: convert the proof to a directed acyclic graph (for
-        lemma-reuse analysis in NeuroProof's ADAPTIVE_CUT procedure)
+        lemma-reuse analysis in CertiProof's ADAPTIVE_CUT procedure)
       - ``check()``: structural re-verification of the proof
     """
 
@@ -415,12 +415,12 @@ class ProofBuilder:
             discharged=[hyp_left.conclusion, hyp_right.conclusion],
             annotation='∨E'))
 
-    # ── Novel NeuroProof rules ─────────────────────────────────────────────────
+    # ── Novel CertiProof rules ─────────────────────────────────────────────────
 
     def adaptive_cut(self, left: ProofStep, right: ProofStep,
                      cut_formula: Formula) -> ProofStep:
         """
-        ADAPTIVE_CUT (NeuroProof §3.3):
+        ADAPTIVE_CUT (CertiProof §3.3):
         A learned variant of the sequent calculus cut rule where the cut
         formula is selected by the ATSS (Adaptive Tactic Synthesis System)
         based on subgoal embedding similarity.
@@ -436,7 +436,7 @@ class ProofBuilder:
     def interpolant(self, phi: ProofStep, psi: ProofStep,
                     itp: Formula) -> ProofStep:
         """
-        INTERPOLANT (NeuroProof §3.4):
+        INTERPOLANT (CertiProof §3.4):
         Craig interpolation step — synthesise a formula I such that
           φ ⊢ I   and   I ⊢ ψ,
         witnessing φ ⊢ ψ via the intermediate I.
@@ -450,7 +450,7 @@ class ProofBuilder:
     def lemma_reuse(self, lemma: ProofStep,
                     annotation: str = '') -> ProofStep:
         """
-        LEMMA_REUSE (NeuroProof §3.5):
+        LEMMA_REUSE (CertiProof §3.5):
         Explicit proof-DAG edge reuse — reference a previously proved
         lemma to avoid duplication in the proof graph.
         """
@@ -464,7 +464,7 @@ class ProofBuilder:
                     learned_clause: Formula,
                     annotation: str = '') -> ProofStep:
         """
-        LEMMA_LEARN (NeuroProof — novel rule):
+        LEMMA_LEARN (CertiProof — novel rule):
         Promote a CDCL-learned conflict clause to a natural deduction lemma.
         
         Given a set of premises φ₁, ..., φₙ that together entail the clause
@@ -473,7 +473,7 @@ class ProofBuilder:
         ensures that the conjunction of premises implies the clause.
         
         This bridges the gap between CNF-level clause learning and
-        ND-level lemma introduction — a novel contribution of NeuroProof.
+        ND-level lemma introduction — a novel contribution of CertiProof.
         """
         return self._add(ProofStep(
             conclusion=learned_clause,
@@ -486,7 +486,7 @@ class ProofBuilder:
                                   interpolant: Formula,
                                   annotation: str = '') -> ProofStep:
         """
-        INTERPOLATION_GUIDED_CUT (NeuroProof — novel rule):
+        INTERPOLATION_GUIDED_CUT (CertiProof — novel rule):
         Structure-aware cut rule guided by Craig interpolation.
         
         Given A ⊢ I (left premise) and I, Γ' ⊢ C (right premise), where I

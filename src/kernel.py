@@ -1,10 +1,10 @@
 """
 kernel.py
 =========
-The trusted verification kernel of NeuroProof.
+The trusted verification kernel of CertiProof.
 
 This module implements the *small trusted core* (TCB — Trusted Computing Base)
-of the NeuroProof proof system.  Every rule of the proof calculus is
+of the CertiProof proof system.  Every rule of the proof calculus is
 verified here by pattern-matching on the proof step and checking the
 semantic conditions.
 
@@ -33,7 +33,7 @@ from .proof import ProofStep, Rule
 
 def verify_step(step: ProofStep) -> bool:
     """
-    Verify a single proof step against the formal rules of NeuroProof.
+    Verify a single proof step against the formal rules of CertiProof.
 
     Returns True iff the step is valid; raises KernelError with a
     diagnostic message on failure when strict=True (default).
@@ -235,7 +235,7 @@ def _check(step: ProofStep) -> None:
               step, f"OR-E: expected {lc.conclusion}")
         return
 
-    # ── Novel NeuroProof rules ─────────────────────────────────────────────────
+    # ── Novel CertiProof rules ─────────────────────────────────────────────────
     if rule == Rule.ADAPTIVE_CUT:
         # Semantically equivalent to classical cut: Γ⊢φ  φ⊢ψ  =>  Γ⊢ψ
         # Accept 1 premise (CDCL refutation proof) or 2 premises (cut form).

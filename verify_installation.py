@@ -1,7 +1,7 @@
 """
 verify_installation.py
 ======================
-Quick verification script for NeuroProof.
+Quick verification script for CertiProof.
 Tests each core module to ensure correct functionality.
 
 Usage:
@@ -208,7 +208,7 @@ def test_solver_module():
     """Test solver.py: CDCL solving, ATSS."""
     print("\n[4] solver.py")
     from src.formula import Var, Not, And, Or, Implies, parse
-    from src.solver import (NeuroProofSolver, EXP3ATSS, SolverStatus,
+    from src.solver import (CertiProofSolver, EXP3ATSS, SolverStatus,
                              Clause, pos, neg_lit, negate_lit,
                              clause_from_formula)
 
@@ -233,7 +233,7 @@ def test_solver_module():
     check("EXP3ATSS weight updated", atss._weights[0] > 0.0)
 
     # Simple SAT solving
-    solver = NeuroProofSolver(max_conflicts=10000)
+    solver = CertiProofSolver(max_conflicts=10000)
     clauses = [
         frozenset({("x1", True), ("x2", True)}),
     ]
@@ -255,7 +255,7 @@ def test_solver_module():
     check("Tautology formula", result.status == SolverStatus.SAT)
 
     # Unsatisfiable formula
-    solver_limited = NeuroProofSolver(max_conflicts=100)
+    solver_limited = CertiProofSolver(max_conflicts=100)
     result = solver_limited.solve_clauses([
         frozenset({("x1", True)}),
         frozenset({("x1", False)}),
@@ -264,7 +264,7 @@ def test_solver_module():
 
     # Unknown for hard instance
     # Generate a phase-transition 3-CNF instance that may not resolve quickly
-    solver_limited2 = NeuroProofSolver(max_conflicts=10)
+    solver_limited2 = CertiProofSolver(max_conflicts=10)
     # Use the formula solver on a moderately complex formula
     f_unknown = parse("(a -> b) & (b -> c) & (c -> d) & (d -> e) & (e -> a) & (a -> ~a)")
     result = solver_limited2.solve_formula(f_unknown)
@@ -340,13 +340,13 @@ def test_tseitin_module():
     # cnf2 includes the assertion that the root aux var is True,
     # so it should be satisfiable. Use solve_clauses to avoid
     # double Tseitin encoding.
-    from src.solver import NeuroProofSolver, SolverStatus, Clause
-    clauses = NeuroProofSolver._cnf_to_clauses(cnf2)
+    from src.solver import CertiProofSolver, SolverStatus, Clause
+    clauses = CertiProofSolver._cnf_to_clauses(cnf2)
     all_vars = set()
     for c in clauses:
         for v, _ in c:
             all_vars.add(v)
-    solver = NeuroProofSolver()
+    solver = CertiProofSolver()
     result = solver.solve_clauses(clauses, all_vars)
     check("Tseitin equisatisfiable (p->p SAT)", result.status == SolverStatus.SAT)
 
@@ -373,7 +373,7 @@ def test_integration():
 
 def main():
     print("=" * 60)
-    print(" NeuroProof Installation Verification")
+    print(" CertiProof Installation Verification")
     print("=" * 60)
 
     t0 = time.perf_counter()
@@ -394,7 +394,7 @@ def main():
     print("=" * 60)
 
     if failed == 0:
-        print("All tests passed! NeuroProof is correctly installed.")
+        print("All tests passed! CertiProof is correctly installed.")
     else:
         print(f"WARNING: {failed} test(s) failed.")
         sys.exit(1)

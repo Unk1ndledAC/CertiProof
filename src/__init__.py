@@ -1,7 +1,7 @@
 """
 __init__.py
 ===========
-NeuroProof: A Hybrid Propositional Proof System with Adaptive Tactic
+CertiProof: A Hybrid Propositional Proof System with Adaptive Tactic
 Synthesis and Certified Proof Checking.
 
 Public API:
@@ -9,7 +9,7 @@ Public API:
   - parse(s): parse an infix formula string
   - ProofBuilder: fluent proof construction API
   - Proof: immutable certified proof object
-  - NeuroProofSolver: CDCL solver with ATSS and interpolation
+  - CertiProofSolver: CDCL solver with ATSS and interpolation
   - TacticEngine: high-level tactic-based prover
   - GNNATSS: GPU-accelerated GNN-based tactic selection (optional)
 """
@@ -21,7 +21,7 @@ from .formula import (
 )
 from .proof import Proof, ProofStep, ProofBuilder, Rule
 from .kernel import verify_step, verify_step_strict, KernelError
-from .solver import NeuroProofSolver, EXP3ATSS, SolverStatus, SolverResult
+from .solver import CertiProofSolver, EXP3ATSS, SolverStatus, SolverResult
 from .tactic import TacticEngine, TacticResult, decide, tauto, refute
 
 # GNN ATSS (optional, requires torch_geometric)
@@ -42,7 +42,7 @@ __all__ = [
     # Kernel
     "verify_step", "verify_step_strict", "KernelError",
     # Solver
-    "NeuroProofSolver", "EXP3ATSS", "SolverStatus", "SolverResult",
+    "CertiProofSolver", "EXP3ATSS", "SolverStatus", "SolverResult",
     # Tactics
     "TacticEngine", "TacticResult", "decide", "tauto", "refute",
 ]

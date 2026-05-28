@@ -1,7 +1,7 @@
-# NeuroProof Experiments: Reproduction Guide
+# CertiProof Experiments: Reproduction Guide
 
 This document describes how to reproduce all twelve experiments reported in the
-paper *"NeuroProof: A Hybrid Propositional Proof System with Adaptive Tactic
+paper *"CertiProof: A Hybrid Propositional Proof System with Adaptive Tactic
 Synthesis and Certified Proof Checking"*.
 
 ---
@@ -56,7 +56,7 @@ pip install torch_geometric>=2.4
 ### Verification
 
 ```bash
-cd /path/to/NeuroProof
+cd /path/to/CertiProof
 python verify_installation.py
 ```
 
@@ -79,7 +79,7 @@ All checks passed.
 ### Generate All Experiment Data
 
 ```bash
-cd /path/to/NeuroProof
+cd /path/to/CertiProof
 python experiments/generate_all_data.py
 ```
 
@@ -98,7 +98,7 @@ This produces all 12 publication-quality PDF figures under `experiments/figures/
 ### Run Live Experiments (Original Suite)
 
 ```bash
-cd /path/to/NeuroProof/experiments
+cd /path/to/CertiProof/experiments
 python benchmark_suite.py --exp all
 ```
 
@@ -124,7 +124,7 @@ python plot_results.py
 ### EXP-1: Classical Tautology Proofs (§7.1, Table 3)
 
 **What it tests:**
-NeuroProof's ability to construct certified proofs for 15 classical propositional
+CertiProof's ability to construct certified proofs for 15 classical propositional
 tautologies, including the law of excluded middle, de Morgan's laws, and the
 hypothetical syllogism.
 
@@ -150,7 +150,7 @@ python benchmark_suite.py --exp 4
 **Reproducing Table 3:**
 Results are saved to `experiments/figures/results_exp45.csv`.
 The columns `proof_size` and `proof_depth` correspond to the "Steps" and "Depth"
-columns in Table 3. Filter by `solver == 'NeuroProof+ATSS'`.
+columns in Table 3. Filter by `solver == 'CertiProof+ATSS'`.
 
 ---
 
@@ -158,7 +158,7 @@ columns in Table 3. Filter by `solver == 'NeuroProof+ATSS'`.
 ### EXP-2: Pigeonhole Principle (§7.2, Table 2)
 
 **What it tests:**
-Honest evaluation of NeuroProof's CDCL kernel on the classic resolution-hard
+Honest evaluation of CertiProof's CDCL kernel on the classic resolution-hard
 Pigeonhole Principle family PHP_n^{n+1}.
 
 **How to run:**
@@ -174,7 +174,7 @@ PHP_3: NP=UNKNOWN(7.6s)   DPLL=UNSAT(0.0s)  Glucose4=UNSAT(0.001s)
 ```
 
 **Interpretation:**
-- NeuroProof returns UNKNOWN for n≥2 (this is correct and expected!).
+- CertiProof returns UNKNOWN for n≥2 (this is correct and expected!).
 - PHP requires exponential resolution proofs (Haken 1985; Pitassi et al. 1993).
 - DPLL exploits PHP's unit-clause structure efficiently.
 - Glucose4's millisecond times reflect its sophisticated preprocessing.
@@ -265,8 +265,8 @@ python benchmark_suite.py --exp 4
 
 **Comparing results:**
 Filter the output CSV by `solver`:
-- `NeuroProof+ATSS` — full system with ATSS guidance
-- `NeuroProof-noATSS` — solver fallback only (no tactic learning)
+- `CertiProof+ATSS` — full system with ATSS guidance
+- `CertiProof-noATSS` — solver fallback only (no tactic learning)
 
 On these simple tautologies both configurations produce identical proof sizes.
 ATSS advantage grows on deeper formulas (depth ≥ 6).
@@ -299,7 +299,7 @@ for diff, ratio in [('Easy', 2.0), ('Phase', 4.3), ('Hard', 6.0)]:
     n_clauses = int(ratio * n_vars)
     for trial in range(n_trials):
         clauses = gen_random_3cnf(n_vars, n_clauses, seed=trial*1000)
-        r._results.append(r._run_neuroproof(f'ablation_{diff.lower()}', trial, clauses))
+        r._results.append(r._run_certiproof(f'ablation_{diff.lower()}', trial, clauses))
         r._results.append(r._run_dpll(f'ablation_{diff.lower()}', trial, clauses))
         r._results.append(r._run_pysat(f'ablation_{diff.lower()}', trial, clauses))
 
@@ -353,7 +353,7 @@ median + IQR aggregation per `(n_vars, solver)`.
 ### EXP-8: SOTA Comparison (§7.8, Tables 5–6)
 
 **What it tests:**
-Quantitative comparison of NeuroProof+ATSS, DPLL-Baseline, and Glucose4 on
+Quantitative comparison of CertiProof+ATSS, DPLL-Baseline, and Glucose4 on
 PHP instances and random 3-CNF at varying ratios.
 
 **How to run:**
@@ -377,7 +377,7 @@ Download Kissat 3.1.1 from https://github.com/arminbiere/kissat and compile:
 ./configure && make
 ./build/kissat path/to/problem.cnf
 ```
-NeuroProof's CDCL is not competitive with industrial solvers on raw speed,
+CertiProof's CDCL is not competitive with industrial solvers on raw speed,
 but it is the only system that produces certified human-readable proofs.
 
 ---
@@ -454,7 +454,7 @@ python experiments/generate_all_data.py   # generates exp10_virtuous_cycle.csv
 ### EXP-11: Extended Resolution (§7.11)
 
 **What it tests:**
-NeuroProof with extended resolution rules added to the CDCL kernel, enabling
+CertiProof with extended resolution rules added to the CDCL kernel, enabling
 polynomial simulation of Frege systems. Compares standard CDCL vs. CDCL+ER on
 benchmark families including PHP and random 3-CNF.
 
@@ -487,7 +487,7 @@ python experiments/generate_all_data.py   # generates exp11_frege_extension.csv
 ### EXP-12: First-Order Extension (§7.12)
 
 **What it tests:**
-NeuroProof's extension to first-order logic via Skolemisation and Herbrand's
+CertiProof's extension to first-order logic via Skolemisation and Herbrand's
 theorem. Evaluates proof construction on first-order problems from graph theory,
 combinatorics, and arithmetic.
 
@@ -556,10 +556,10 @@ in `experiments/figures/` and recompile:
 
 ```bash
 cd paper
-pdflatex neuroproof.tex
-bibtex neuroproof
-pdflatex neuroproof.tex
-pdflatex neuroproof.tex
+pdflatex certiproof.tex
+bibtex certiproof
+pdflatex certiproof.tex
+pdflatex certiproof.tex
 ```
 
 The paper uses `\includegraphics{../experiments/figures/fig_*.pdf}` to embed
@@ -616,18 +616,18 @@ pip install torch_geometric
 ```
 Or skip EXP-9 by running `--exp 1-8`.
 
-### NeuroProof returns UNKNOWN on small instances
+### CertiProof returns UNKNOWN on small instances
 Increase the conflict limit:
 ```python
-from src.solver import NeuroProofSolver, ATSS
-solver = NeuroProofSolver(atss=ATSS(), max_conflicts=500_000)
+from src.solver import CertiProofSolver, ATSS
+solver = CertiProofSolver(atss=ATSS(), max_conflicts=500_000)
 ```
 
 ### Rocq / Coq verification
 To run the Rocq formalisation:
 ```bash
 # Requires Coq 8.19+ / Rocq 9.0+
-coqc coq/NeuroProof.v
+coqc coq/CertiProof.v
 ```
 This verifies the soundness theorem and the `adaptive_cut_sound` lemma.
 The completeness theorem (`completeness_statement`) currently uses `admit`
@@ -642,9 +642,9 @@ instead of ~26ms. This does not affect correctness.
 ## File Layout
 
 ```
-NeuroProof/
+CertiProof/
 ├── paper/
-│   ├── neuroproof.tex          # Main paper (LaTeX)
+│   ├── certiproof.tex          # Main paper (LaTeX)
 │   ├── cover_letter.tex        # Cover letter (CAV 2027 / CPP 2027)
 │   └── references.bib          # Bibliography
 ├── src/
@@ -656,7 +656,7 @@ NeuroProof/
 │   ├── tseitin.py              # Tseitin CNF encoding
 │   └── atss_gnn.py             # GNN-based tactic selection
 ├── coq/
-│   └── NeuroProof.v            # Rocq/Coq formalisation (487 lines)
+│   └── CertiProof.v            # Rocq/Coq formalisation (487 lines)
 ├── experiments/
 │   ├── benchmark_suite.py      # All 9 core experiments (main runner)
 │   ├── generate_all_data.py    # Generate all 12 experiment CSV datasets

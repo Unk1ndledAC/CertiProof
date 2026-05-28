@@ -1,4 +1,4 @@
-# NeuroProof - Dependencies
+# CertiProof - Dependencies
 # Core solver uses only Python stdlib (formula, proof, kernel, solver, tactic, tseitin)
 # Plotting and experiments require:
 matplotlib>=3.8

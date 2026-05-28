@@ -1,7 +1,7 @@
 (* ============================================================
-   NeuroProof.v
+   CertiProof.v
    ============================================================
-   Rocq/Coq formal certification of the NeuroProof kernel rules.
+   Rocq/Coq formal certification of the CertiProof kernel rules.
 
    This file provides:
      1. A shallow embedding of propositional logic in Prop.
@@ -12,7 +12,7 @@
      4. Formal verification of the ADAPTIVE_CUT rule's soundness.
 
    Compilation:
-     coqc NeuroProof.v    (requires Coq >= 8.16 / Rocq >= 9.0)
+     coqc CertiProof.v    (requires Coq >= 8.16 / Rocq >= 9.0)
 
    References:
      - Gentzen (1935): Sequent calculus LK.
@@ -563,7 +563,7 @@ Proof.
 Qed.
 
 (* ──────────────────────────────────────────────────────────────
-   §6.  ADAPTIVE_CUT Soundness (NeuroProof novel contribution)
+   §6.  ADAPTIVE_CUT Soundness (CertiProof novel contribution)
    ────────────────────────────────────────────────────────────── *)
 
 (**
@@ -667,7 +667,7 @@ Qed.
   Example derivation:
     From p→q, q→r, p ⊢ r
 
-  This corresponds to the NeuroProof proof constructed in Python by
+  This corresponds to the CertiProof proof constructed in Python by
     pb.imp_e(pb.imp_e(h1, h3), h2)
 *)
 Example mp_chain : forall v (p q r : Formula),
@@ -933,7 +933,7 @@ Qed.
 (**
   Theorem (Kálmár Completeness):
     Every classical tautology has a syntactic proof in the
-    natural deduction fragment of NeuroProof.
+    natural deduction fragment of CertiProof.
 
     If φ is a tautology (eval v φ = true for all valuations v),
     then there exists a finite derivation tree [Provable [] φ]
@@ -1119,7 +1119,7 @@ Qed.
 (**
   Theorem (Kálmár Completeness):
     Every classical tautology has a syntactic proof in the
-    natural deduction fragment of NeuroProof.
+    natural deduction fragment of CertiProof.
 
   The proof combines three ingredients, now all fully proved:
     1. kalmar_lemma: signed-literal proofs for every valuation (structural induction).
@@ -1168,4 +1168,4 @@ Proof.
   apply Htaut.
 Qed.
 
-(* End of NeuroProof.v *)
+(* End of CertiProof.v *)
