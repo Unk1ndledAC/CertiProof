@@ -55,4 +55,5 @@ experiments/results_gnn.csv
 *.pt
 *.pth
 *.ckpt
+TODO.md
 nul
