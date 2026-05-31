@@ -639,6 +639,95 @@ instead of ~26ms. This does not affect correctness.
 
 ---
 
+<a name="exp-revision"></a>
+## 审稿修订实验 (P1-2, P1-4c)
+
+以下是针对审稿意见的新增实验脚本。所有实验均已创建独立运行 Python 文件。
+
+---
+
+<a name="exp-structural"></a>
+### EXP-13: 结构化 CNF 基准 (P1-2b, 50-200 变量范围)
+
+**审稿要求:** 纳入 QEDFLib 或类似证明库中的中等规模公式 (50-200 变量)。
+
+**替代方案:** QEDFLib 是纯 Metamath 证明库，无法直接作为 CNF 基准。本实验改用
+五类结构化 CNF 公式，覆盖 50-200 变量范围：
+
+| 子实验 | 基准类型 | 变量范围 | 说明 |
+|--------|---------|---------|------|
+| A | 扩展 PHP (n=4..7) | 20-56 | 经典 resolution 难解实例 |
+| B | 大图 Tseitin (15-30 顶点) | 40-200 | 图论 XOR 编码 |
+| C | K-着色 (k=3, 10-20 顶点) | 30-60 | 组合约束编码 |
+| D | 随机 3-CNF 相变 (50-200 变量) | 50-200 | SAT 竞赛标准基准 |
+| E | 精确-one 约束 (20-100 bits) | 20-100 | 计数约束编码 |
+
+**脚本:** `experiments/exp_structural_benchmarks.py`
+
+**运行:**
+```bash
+python experiments/exp_structural_benchmarks.py              # 完整运行 (~30-60 min)
+python experiments/exp_structural_benchmarks.py --quick      # 快速测试 (~2-5 min)
+python experiments/exp_structural_benchmarks.py --exp D      # 仅随机3-CNF
+python experiments/exp_structural_benchmarks.py --timeout 180  # 自定义超时
+```
+
+**输出:** `experiments/results/ext_structural_benchmarks.csv`
+
+---
+
+<a name="exp-100var"></a>
+### EXP-14: 100-变量随机 3-CNF 相变 (P1-2c)
+
+**审稿要求:** 扩展随机 3-CNF 到 100 变量 (相位阈值 alpha=4.267)。
+
+**脚本:** `experiments/ext_benchmarks.py --exp 100var`
+
+**输出:** `experiments/results/ext_100var_3cnf.csv`
+
+---
+
+<a name="exp-php8"></a>
+### EXP-15: 扩展 PHP 到 n=8 (P1-2d)
+
+**审稿要求:** 扩展 PHP 到 n >= 8。
+
+**脚本:** `experiments/ext_benchmarks.py --exp php`
+
+**输出:** `experiments/results/ext_php_n8.csv`
+
+---
+
+<a name="exp-ablation-interp"></a>
+### EXP-16: 插值反馈消融实验 (P1-4c)
+
+**审稿要求:** 隔离经验反馈循环的消融实验 -- 关闭 vs 开启插值反馈。
+
+**实验设计:** 四类 A/B 变量分区公式上比较插值 ON vs OFF：
+
+| 子实验 | 公式类型 | 变量分区 |
+|--------|---------|---------|
+| E1 | 分区 PHP | 鸽群分入 A/B 组，共享额外鸽变量 |
+| E2 | 重叠 CNF | A/B 子句分别生成，共享变量产生矛盾 |
+| E3 | 精确-one 矛盾 | 两套系统在共享变量互斥 |
+| E4 | 随机分区 CNF | 随机 UNSAT 变量 40/40/20% 分为 A/共享/B |
+
+**脚本:** `experiments/exp_ablation_interpolation.py`
+
+**运行:**
+```bash
+python experiments/exp_ablation_interpolation.py              # 完整运行 (~20-40 min)
+python experiments/exp_ablation_interpolation.py --quick      # 快速测试 (~2-5 min)
+python experiments/exp_ablation_interpolation.py --exp 2      # 仅重叠CNF
+python experiments/exp_ablation_interpolation.py --timeout 90  # 自定义超时
+```
+
+**输出:** `experiments/results/ext_ablation_interpolation.csv`
+
+**关键指标:** `time_sec` (插值是否加速), `conflicts` (是否减少冲突), `proof_size` (证明是否更紧凑)
+
+---
+
 ## File Layout
 
 ```
@@ -658,9 +747,12 @@ CertiProof/
 ├── coq/
 │   └── CertiProof.v            # Rocq/Coq formalisation (487 lines)
 ├── experiments/
-│   ├── benchmark_suite.py      # All 9 core experiments (main runner)
-│   ├── generate_all_data.py    # Generate all 12 experiment CSV datasets
-│   ├── plot_all_figures.py     # Generate all 12 publication-quality figures
+│   ├── benchmark_suite.py          # All 9 core experiments (main runner)
+│   ├── generate_all_data.py        # Generate all 12 experiment CSV datasets
+│   ├── ext_benchmarks.py           # Extended benchmarks (P1-2c: 100var, P1-2d: PHP n=8, P1-2a: TPTP)
+│   ├── exp_structural_benchmarks.py # EXP-13: Structured CNF 50-200 vars (P1-2b)
+│   ├── exp_ablation_interpolation.py # EXP-16: Interpolation ablation (P1-4c)
+│   ├── plot_all_figures.py         # Generate all 12 publication-quality figures
 │   ├── plot_results.py         # Figure generation (original suite)
 │   ├── results.csv             # Pre-run EXP-4 results (15 tautologies)
 │   ├── results/                # 12 experiment CSV datasets
