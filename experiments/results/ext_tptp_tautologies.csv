@@ -1,0 +1,63 @@
+idx,formula,n_vars,atss_status,atss_time,atss_size,atss_depth,noatss_status,noatss_time,noatss_size,noatss_depth
+0,p -> p,1,PROVED,0.000129,2,1,PROVED,6e-05,2,1
+1,p -> (q -> p),2,PROVED,7.1e-05,4,3,PROVED,6.1e-05,4,3
+2,(p -> q) -> (q -> r) -> (p -> r),3,PROVED,0.000172,8,5,PROVED,0.000158,8,5
+3,(p & q) -> p,2,PROVED,4.1e-05,3,2,PROVED,3.6e-05,3,2
+4,(p & q) -> q,2,PROVED,4.1e-05,5,3,PROVED,3.8e-05,5,3
+5,p -> (p | q),2,PROVED,6.7e-05,4,3,PROVED,9e-05,4,3
+6,q -> (p | q),2,PROVED,5e-05,5,4,PROVED,3.7e-05,5,4
+7,(p -> q) -> (~q -> ~p),2,PROVED,0.001222,5,4,PROVED,0.000509,5,4
+8,(~p -> ~q) -> (q -> p),2,PROVED,5.4e-05,5,4,PROVED,4.8e-05,5,4
+9,((p | q) & ~p) -> q,2,PROVED,4.8e-05,5,3,PROVED,4.3e-05,5,3
+10,((p -> q) & (q -> r)) -> (p -> r),3,PROVED,6.2e-05,8,5,PROVED,5.8e-05,8,5
+11,(p <-> q) -> (q <-> p),2,PROVED,9.3e-05,10,5,PROVED,8.9e-05,10,5
+12,(p <-> q) -> (p -> q),2,PROVED,4.3e-05,7,5,PROVED,4.4e-05,7,5
+13,(p <-> q) -> (q -> p),2,PROVED,4.3e-05,5,4,PROVED,4.1e-05,5,4
+14,(p -> q) -> ((p -> ~q) -> ~p),2,PROVED,8.1e-05,6,5,PROVED,7.5e-05,6,5
+15,((p -> q) & p) -> q,2,PROVED,4.5e-05,5,3,PROVED,4.3e-05,5,3
+16,((p -> q) & ~q) -> ~p,2,PROVED,4.7e-05,5,4,PROVED,4.5e-05,5,4
+17,p | ~p,1,PROVED,3e-05,3,2,PROVED,0.000172,3,2
+18,~(p & ~p),1,PROVED,3.6e-05,4,3,PROVED,5.1e-05,4,3
+19,~~p -> p,1,PROVED,1e-05,3,2,PROVED,8e-06,3,2
+20,p -> ~~p,1,PROVED,9e-06,4,3,PROVED,7e-06,4,3
+21,(p -> q) -> (~p -> q) -> q,2,PROVED,0.0003,6,4,PROVED,9.8e-05,6,4
+22,(p & q -> r) -> (p -> q -> r),3,PROVED,0.000115,9,6,PROVED,0.000107,9,6
+23,(p -> q -> r) -> (p & q -> r),3,PROVED,9.1e-05,8,5,PROVED,8.4e-05,8,5
+24,(p -> ~p) -> ~p,1,PROVED,4.7e-05,5,4,PROVED,3.9e-05,5,4
+25,~p -> (p -> q),2,PROVED,4e-05,7,5,PROVED,3.7e-05,7,5
+26,(p -> q) | (q -> p),2,PROVED,4.5e-05,7,5,PROVED,3.5e-05,7,5
+27,~((p -> q) & (q -> p)) -> (p & ~q) | (q & ~p),2,PROVED,0.000148,9,6,PROVED,0.00014,9,6
+28,p -> q -> p & q,2,PROVED,9.2e-05,8,5,PROVED,8.2e-05,8,5
+29,(p -> r) -> (q -> r) -> (p | q -> r),3,PROVED,0.000122,9,6,PROVED,0.000123,9,6
+30,(p -> q) -> (p -> r) -> (p -> q & r),3,PROVED,0.000147,11,7,PROVED,0.000147,11,7
+31,(p <-> q) -> (p <-> (q <-> r)) -> (p <-> r),3,PROVED,0.000144,12,7,PROVED,0.00014,12,7
+32,(p -> q) -> (p -> (q -> r)) -> (p -> r),3,PROVED,0.000102,9,6,PROVED,9.3e-05,9,6
+33,((p -> q) -> p) -> p,2,PROVED,4.4e-05,3,2,PROVED,4.2e-05,3,2
+34,p & (p -> q) -> q,2,PROVED,4.4e-05,5,3,PROVED,4.3e-05,5,3
+35,(p | q) & ~p -> q,2,PROVED,1.6e-05,6,4,PROVED,1.4e-05,6,4
+36,~(~p & ~q) -> p | q,2,PROVED,5e-05,5,4,PROVED,4.8e-05,5,4
+37,~(~p | ~q) -> p & q,2,PROVED,4.8e-05,8,5,PROVED,4.7e-05,8,5
+38,(p & q) | (p & r) -> p & (q | r),3,PROVED,0.000106,8,5,PROVED,0.000101,8,5
+39,p | (q & r) -> (p | q) & (p | r),3,PROVED,0.000104,7,5,PROVED,0.000102,7,5
+40,(p -> (q -> r)) -> ((p -> q) -> (p -> r)),3,PROVED,9.6e-05,9,6,PROVED,9.3e-05,9,6
+41,(p -> q) -> ((r -> s) -> (p & r -> q & s)),4,PROVED,0.000226,13,8,PROVED,0.000214,13,8
+42,p -> (q -> p & q),2,PROVED,1.8e-05,9,6,PROVED,0.000158,9,6
+43,(p | p) -> p,1,PROVED,5.8e-05,3,2,PROVED,3.8e-05,3,2
+44,q -> p | q,2,PROVED,1.3e-05,6,5,PROVED,1.1e-05,6,5
+45,(p | q) -> (q | p),2,PROVED,7.3e-05,6,4,PROVED,6.2e-05,6,4
+46,(p -> r) -> (q | p -> q | r),3,PROVED,9e-05,8,6,PROVED,8.5e-05,8,6
+47,(p -> q) -> (r | p -> r | q),3,PROVED,0.000118,9,6,PROVED,0.000105,9,6
+48,(p -> q) -> ((p -> r) -> (p -> (q & r))),3,PROVED,3e-05,12,8,PROVED,2.5e-05,12,8
+49,(p & q) -> p | q,2,PROVED,4.7e-05,5,4,PROVED,4.4e-05,5,4
+50,(p | q) & ~p -> q,2,PROVED,1.7e-05,7,5,PROVED,1.5e-05,7,5
+51,(p -> q) -> (p & r -> q & r),3,PROVED,9.2e-05,11,7,PROVED,8.7e-05,11,7
+52,(p <-> q) <-> (p -> q) & (q -> p),2,PROVED,0.000258,14,7,PROVED,0.000373,14,7
+53,p -> (q -> p & q) -> p,2,PROVED,8.9e-05,4,3,PROVED,7.7e-05,4,3
+54,((p -> q) -> (p -> r)) -> (p -> (q -> r)),3,PROVED,6.8e-05,10,7,PROVED,6.4e-05,10,7
+55,(p -> (q -> r)) -> (q -> (p -> r)),3,PROVED,9.2e-05,9,6,PROVED,8.1e-05,9,6
+56,(p -> p -> q) -> (p -> q),2,PROVED,5.1e-05,7,5,PROVED,4.8e-05,7,5
+57,((p -> q) -> p) -> ((p -> q) -> q),2,PROVED,8.7e-05,6,4,PROVED,8.1e-05,6,4
+58,p & q -> p | q,2,PROVED,1.7e-05,6,5,PROVED,1.4e-05,6,5
+59,(p -> q) & (r -> s) & (p | r) -> q | s,4,PROVED,0.00232,6,4,PROVED,0.000142,6,4
+60,~p & ~q -> ~(p | q),2,PROVED,0.00014,5,4,PROVED,9.6e-05,5,4
+61,~(p | q) -> ~p & ~q,2,PROVED,7.4e-05,9,6,PROVED,6.5e-05,9,6

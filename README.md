@@ -8,7 +8,7 @@ CertiProof is a hybrid propositional proof system that combines natural deductio
 
 ## Key Features
 
-- **Hybrid proof calculus**: Natural deduction + sequent calculus + resolution, p-simulating Frege
+- **Hybrid proof calculus**: Natural deduction + sequent calculus + resolution, simulating Frege (Frege-to-ND step mechanically verified in Rocq; polynomial-size bound is future work)
 - **Five novel rules**: ADAPTIVE\_CUT, INTERPOLANT, LEMMA\_REUSE, LEMMA\_LEARN (CDCL clauses → ND lemmas), INTERPOLATION\_GUIDED\_CUT (semantic cut via Craig interpolants)
 - **EXP3-ATSS**: Adversarial bandit framework (EXP3 algorithm) with provable regret bound $O(\sqrt{KT\ln K})$ — first application of adversarial bandit theory to proof search
 - **CDCL solver**: Full CDCL with 1-UIP conflict analysis, two-watched-literal BCP, LBD-based clause deletion, Glucose-style dynamic restarts, VSIDS heuristic
@@ -21,32 +21,40 @@ CertiProof is a hybrid propositional proof system that combines natural deductio
 
 ## Quick Start
 
-### 1. Verify Installation
+### 1. Quick Verification
 
 ```bash
 cd CertiProof
 python verify_installation.py
 ```
 
-### 2. Run Experiments
+### 2. One-Command Reproduction
 
 ```bash
-# Generate all experiment datasets (<1 minute, theoretical data)
-python experiments/generate_all_data.py
+# Full reproduction (experiments + figures + paper)
+./reproduce.sh
 
-# Generate all publication-quality figures
-python experiments/plot_all_figures.py
+# Quick test (reduced parameters)
+./reproduce.sh --quick
 
-# Or run the original live experiment suite
-python experiments/benchmark_suite.py --exp all
+# Skip paper compilation
+./reproduce.sh --skip-paper
+
+# Skip experiments (use existing data)
+./reproduce.sh --skip-experiments
 ```
 
-Results are saved to `experiments/results/` and figures to
-`experiments/figures/`.
+### 3. Docker Reproduction (fully isolated)
 
-See [EXPERIMENTS.md](EXPERIMENTS.md) for detailed documentation.
+```bash
+# Build the artifact image
+docker build -t certiproof .
 
-### 3. Generate Plots (optional)
+# Run full reproduction inside Docker
+docker run -it certiproof ./reproduce.sh
+```
+
+### 4. Run Individual Experiments
 
 ```bash
 pip install matplotlib numpy pandas
@@ -179,6 +187,20 @@ if result.interpolant:
     print(f"Interpolant: {result.interpolant}")
 ```
 
+## Artifact Availability
+
+All materials required to reproduce this work are publicly available:
+
+- **GitHub repository**: `https://github.com/quguanheng/CertiProof`
+  (mirror: `https://codeberg.org/quguanheng/CertiProof`)
+- **Docker Hub**: `docker pull quguanheng/certiproof`
+  (see `Dockerfile` in repository root)
+- **One-command reproduction**: `./reproduce.sh`
+  (runs Rocq verification → experiments → figures → paper compilation)
+
+Requirements: Python 3.12, `pip install -r requirements.txt`, optional Rocq 9.0.
+GPU needed only for Experiment 8 (GNN-ATSS).
+
 ## Architecture
 
 ### Trusted Computing Base (TCB)
@@ -257,7 +279,7 @@ Operation-primitive analysis is a methodology for fair benchmarking across solve
 | Theorem                           | Statement                                                    | Proof                                                        |
 | --------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | Soundness (Thm 1)                 | $ \Gamma \vdash \varphi \Rightarrow \Gamma \vDash \varphi $  | Structural induction on derivation tree; Mechanically verified in Rocq |
-| Completeness (Thm 2)              | $ \text{NP} $  p-simulates Frege                             | Translation: Frege  $ \to $  ND  $ \to $  Sequent Calculus  $ \to $  NP |
+| Completeness (Thm 2)              | \CP{} simulates Frege (logical correctness verified in Rocq) | Translation: Frege → ND → Sequent Calculus → \CP{}; polynomial-size bound is future work |
 | Kalmár Completeness (Thm 3)       | Every tautology has a pure ND proof                          | Constructive induction on variables (Kalmár's method)        |
 | ATSS Regret (Thm 4)               | $ \mathbb{E}[\text{Regret}_T] \leq 2\sqrt{(e-1)KT\ln K} + O(\ln K) $ | Potential analysis + Azuma-Hoeffding inequality              |
 | Incremental Interpolation (Thm 5) | Incremental  $ \equiv $  post-hoc Pudlák                     | Structural induction on CDCL resolution trace                |
