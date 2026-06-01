@@ -287,7 +287,7 @@ Operation-primitive analysis is a methodology for fair benchmarking across solve
 
 ## Citation
 
-This project was archived in Zenodo [![DOI](https://zenodo.org/badge/1230812812.svg)](https://doi.org/10.5281/zenodo.20382686).
+This project was archived in Zenodo [![DOI](https://img.shields.io/badge/DOI-zenodo.20382686-blue.svg)](https://doi.org/10.5281/zenodo.20382686).
 
 ```bibtex
 @article{qu2026certiproof,
